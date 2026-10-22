@@ -2,6 +2,7 @@ using System.Text;
 using LLMNetHelper.Abstractions;
 using LLMNetHelper.Roslyn;
 using Microsoft.CodeAnalysis;
+using Microsoft.Extensions.Logging;
 
 namespace LLMNetHelper.CodeChange;
 
@@ -87,6 +88,7 @@ public sealed class ChangeTransaction
     private readonly AstPatcher _patcher;
     private readonly CompilationValidator _validator;
     private readonly SolutionLoader _loader;
+    private readonly ILogger<ChangeTransaction>? _logger;
 
     public ChangeTransaction(
         CodeChangeOptions options,
@@ -94,7 +96,8 @@ public sealed class ChangeTransaction
         IBuildRunner build,
         AstPatcher patcher,
         CompilationValidator validator,
-        SolutionLoader loader)
+        SolutionLoader loader,
+        ILogger<ChangeTransaction>? logger = null)
     {
         _options = options;
         _git = git;
@@ -102,6 +105,7 @@ public sealed class ChangeTransaction
         _patcher = patcher;
         _validator = validator;
         _loader = loader;
+        _logger = logger;
     }
 
     /// <summary>
@@ -130,8 +134,12 @@ public sealed class ChangeTransaction
 
         if (_options.RequireCleanWorktree && !await _git.IsWorktreeCleanAsync(ct).ConfigureAwait(false))
         {
+            var dirtyFiles = await _git.GetDirtyFilesAsync(ct).ConfigureAwait(false);
+            var detail = dirtyFiles.Count > 0
+                ? $"изменённые файлы ({dirtyFiles.Count}):\n" + string.Join("\n", dirtyFiles.Take(20))
+                : "(porcelain-вывод пуст)";
             return ChangeOutcome.Skipped(ChangeFailure.DirtyWorktree,
-                "рабочее дерево содержит незакоммиченные изменения");
+                $"рабочее дерево содержит незакоммиченные изменения:\n{detail}");
         }
 
         var baseBranch = await _git.GetCurrentBranchAsync(ct).ConfigureAwait(false) ?? _options.BaseBranch;
@@ -218,6 +226,22 @@ public sealed class ChangeTransaction
             }
 
             var sha = await _git.GetHeadShaAsync(ct).ConfigureAwait(false);
+
+            // Проверка: origin не ушёл вперёд — информационное предупреждение.
+            try
+            {
+                var aheadCount = await _git.CountAheadAsync("origin/main", ct).ConfigureAwait(false);
+                if (aheadCount > 0)
+                {
+                    _logger?.LogWarning(
+                        "origin/main имеет {AheadCount} новых коммитов после нашего коммита {Sha}",
+                        aheadCount, sha);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogDebug(ex, "Не удалось проверить diff с origin (не критично)");
+            }
 
             _loader.InvalidateCache();
 

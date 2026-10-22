@@ -126,12 +126,131 @@ public sealed class GitService
     }
 
     /// <summary>
+    /// Список изменённых/untracked файлов (porcelain формат).
+    /// </summary>
+    public async Task<IReadOnlyList<string>> GetDirtyFilesAsync(CancellationToken ct = default)
+    {
+        var result = await RunGitAsync(["status", "--porcelain"], ct).ConfigureAwait(false);
+        if (!result.Succeeded)
+        {
+            return [];
+        }
+
+        return result.StdOut
+            .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(line => line.Length > 3 ? line.Substring(3).Trim() : line)
+            .ToList()
+            .AsReadOnly();
+    }
+
+    /// <summary>
+    /// Количество коммитов, которые HEAD имеет выше origin/&lt;branch&gt;.
+    /// Возвращает 0, если origin не настроен или ветки нет.
+    /// </summary>
+    public async Task<int> CountAheadAsync(string branch, CancellationToken ct = default)
+    {
+        var result = await RunGitAsync(
+            ["log", "--oneline", $"HEAD..{branch}"], ct).ConfigureAwait(false);
+
+        if (!result.Succeeded || string.IsNullOrWhiteSpace(result.StdOut))
+        {
+            return 0;
+        }
+
+        return result.StdOut.Split(
+            new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).Length;
+    }
+
+    /// <summary>
     /// Diff текущих изменений (для отчёта).
     /// </summary>
     public async Task<string> GetDiffAsync(CancellationToken ct = default)
     {
         var result = await RunGitAsync(["diff", "HEAD"], ct).ConfigureAwait(false);
         return result.Succeeded ? result.StdOut : "";
+    }
+
+    /// <summary>
+    /// Получает обновления из всех удалённых репозиториев.
+    /// <para>
+    /// Возвращает <c>false</c>, если remote не настроен — это не ошибка,
+    /// а нормальное состояние для локального репозитория.
+    /// </para>
+    /// </summary>
+    public async Task<bool> FetchAsync(CancellationToken ct = default)
+    {
+        // 1. Проверяем, есть ли remotes — если нет, сразу false.
+        var remotes = await RunGitAsync(["remote"], ct).ConfigureAwait(false);
+        if (remotes.Succeeded && string.IsNullOrWhiteSpace(remotes.StdOut.Trim()))
+        {
+            return false;
+        }
+
+        var result = await RunGitAsync(
+            ["fetch", "--all", "--tags", "--prune"], ct).ConfigureAwait(false);
+
+        if (!result.Succeeded)
+        {
+            // Unable to access / could not resolve host — remote есть, но недоступен.
+            var err = result.StdErr.ToLowerInvariant();
+            if (err.Contains("unable to access") ||
+                err.Contains("could not resolve host"))
+            {
+                return false;
+            }
+
+            throw new InvalidOperationException(
+                $"git fetch failed: {result.Describe()}");
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Жёстко переключает рабочую директорию на remote-ветку.
+    /// <para>
+    /// 1. Выполняет <c>git reset --hard origin/&lt;текущая ветка&gt;</c>.
+    /// 2. Выполняет <c>git clean -fd</c> для удаления untracked-файлов.
+    /// </para>
+    /// <para>
+    /// Требует, чтобы fetch уже был выполнен. Если remote-ветка с тем же
+    /// именем не найдена — фоллбэк на <c>origin/main</c>.
+    /// </para>
+    /// </summary>
+    public async Task<ProcessResult> PullHardAsync(CancellationToken ct = default)
+    {
+        var currentBranch = await GetCurrentBranchAsync(ct).ConfigureAwait(false);
+        var remoteBranch = currentBranch is not null
+            ? $"origin/{currentBranch}"
+            : "origin/main";
+
+        // 1. Сбросить всё к origin/<текущая ветка>
+        var reset = await RunGitAsync(
+            ["reset", "--hard", remoteBranch], ct).ConfigureAwait(false);
+
+        if (!reset.Succeeded)
+        {
+            // remote-ветка может не совпадать по имени — пробуем main
+            if (!string.Equals(remoteBranch, "origin/main", StringComparison.Ordinal))
+            {
+                reset = await RunGitAsync(
+                    ["reset", "--hard", "origin/main"], ct).ConfigureAwait(false);
+            }
+        }
+
+        if (!reset.Succeeded)
+        {
+            return reset;
+        }
+
+        // 2. Clean -fd (удалить untracked + ignored)
+        var clean = await RunGitAsync(["clean", "-fd"], ct).ConfigureAwait(false);
+        if (!clean.Succeeded)
+        {
+            return clean;
+        }
+
+        return reset;
     }
 
     /// <summary>

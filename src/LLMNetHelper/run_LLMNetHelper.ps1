@@ -12,6 +12,7 @@
 #   pwsh -File src/LLMNetHelper/run_LLMNetHelper.ps1 -Info               # показать разрешённую конфигурацию
 #   pwsh -File src/LLMNetHelper/run_LLMNetHelper.ps1 -NoBuild ...        # без пересборки
 #   pwsh -File src/LLMNetHelper/run_LLMNetHelper.ps1 -NoPause ...        # не ждать клавиши (автозапуски/CI)
+#   pwsh -File src/LLMNetHelper/run_LLMNetHelper.ps1 -SkipPull ...       # не обновлять репозиторий перед прогоном
 #
 # Режимы (взаимно исключают друг друга, проверяются в этом порядке):
 #   -Test > -Check > -Info > -Stop > -Daemon > -RunNow > -DryRun (умолчание)
@@ -61,7 +62,8 @@ param(
     [switch]$NoSemanticKernel,
     [switch]$Roslyn,
     [switch]$CodeChange,
-    [switch]$NoPause
+    [switch]$NoPause,
+    [switch]$SkipPull
 )
 
 $ErrorActionPreference = "Stop"
@@ -572,6 +574,34 @@ $appArgs = @()
 if ($DryRun) { $appArgs += "--dry-run" } else { $appArgs += "--run-now" }
 if ($Hours -gt 0) { $appArgs += "--hours=$Hours" }
 if ($Since) { $appArgs += "--since=$Since" }
+
+# --- Обновление репозитория перед прогоном ----------------------
+if (-not $SkipPull) {
+    $repoRoot = $ProjectRoot
+    if (Test-Path (Join-Path $repoRoot ".git")) {
+        Write-Host "[pre] git fetch --all --prune..." -ForegroundColor DarkGray
+        $fetch = & git -C $repoRoot fetch --all --prune 2>&1
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "[pre] git fetch OK" -ForegroundColor DarkGray
+            # Pull hard — сброс к origin/main
+            $branch = & git -C $repoRoot rev-parse --abbrev-ref HEAD 2>$null
+            $remoteBranch = $branch.Trim()
+            if (-not $remoteBranch) { $remoteBranch = "main" }
+
+            Write-Host "[pre] git reset --hard origin/$remoteBranch..." -ForegroundColor DarkGray
+            & git -C $repoRoot reset --hard "origin/$remoteBranch" 2>&1 | Out-Null
+            if ($LASTEXITCODE -ne 0) {
+                Write-Host "[pre] fallback: git reset --hard origin/main..." -ForegroundColor DarkGray
+                & git -C $repoRoot reset --hard origin/main 2>&1 | Out-Null
+            }
+
+            Write-Host "[pre] git clean -fd..." -ForegroundColor DarkGray
+            & git -C $repoRoot clean -fd 2>&1 | Out-Null
+        } else {
+            Write-Host "[pre] git fetch failed (не критично): $($fetch -join ' ')" -ForegroundColor DarkGray
+        }
+    }
+}
 
 Invoke-Build
 

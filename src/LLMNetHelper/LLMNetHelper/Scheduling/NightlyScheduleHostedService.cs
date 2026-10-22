@@ -1,3 +1,4 @@
+using LLMNetHelper.CodeChange;
 using LLMNetHelper.Core.Storage;
 using LLMNetHelper.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
@@ -104,6 +105,22 @@ public sealed class NightlyScheduleHostedService : BackgroundService
         try
         {
             _logger.LogInformation(catchUp ? "Catch-up прогон..." : "Начало ночного прогона...");
+
+            // Обновление репозитория перед прогоном.
+            var gitService = _serviceProvider.GetRequiredService<CodeChange.GitService>();
+            var fetched = await gitService.FetchAsync(ct).ConfigureAwait(false);
+            _logger.LogInformation(
+                "Git fetch: {Fetched}, catch-up pull: {CatchUp}", fetched, catchUp);
+
+            if (catchUp && fetched)
+            {
+                var pull = await gitService.PullHardAsync(ct).ConfigureAwait(false);
+                if (!pull.Succeeded)
+                {
+                    _logger.LogWarning(
+                        "Catch-up pull не удался (не критично): {Error}", pull.Describe());
+                }
+            }
 
             // Хранилище и агент — синглтоны; scope нужен для будущих scoped-зависимостей.
             var factStore = _serviceProvider.GetRequiredService<Abstractions.IFactStore>();
