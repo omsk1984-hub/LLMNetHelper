@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Проект НЕ входит в основное решение при EnableSemanticKernel=false.
+    Включение: dotnet build -p:EnableSemanticKernel=true
+    либо свойство в Directory.Build.props.
+
+    Причина условности: SK добавляет ~30 транзитивных пакетов и требует
+    согласованной версии Microsoft.Extensions.AI. Пока оркестратор не нужен,
+    решение собирается без него — быстрее и без лишних зависимостей.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>ArtasTools.MonitorAgent.Orchestration.SemanticKernel</AssemblyName>
+    <RootNamespace>ArtasTools.MonitorAgent.Orchestration.SemanticKernel</RootNamespace>
+
+    <!-- Флаг включения SK -->
+    <EnableSemanticKernel Condition="'$(EnableSemanticKernel)' == ''">true</EnableSemanticKernel>
+    <DefineConstants Condition="'$(EnableSemanticKernel)' == 'true'">$(DefineConstants);SK_ENABLED</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ArtasTools.MonitorAgent.Abstractions\ArtasTools.MonitorAgent.Abstractions.csproj" />
+    <ProjectReference Include="..\ArtasTools.MonitorAgent.Agent\ArtasTools.MonitorAgent.Agent.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(EnableSemanticKernel)' == 'true'">
+    <PackageReference Include="Microsoft.SemanticKernel.Core" Version="1.81.0" />
+    <PackageReference Include="Microsoft.SemanticKernel.Connectors.OpenAI" Version="1.81.0" />
+  </ItemGroup>
+
+</Project>

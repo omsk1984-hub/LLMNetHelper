@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>ArtasTools.MonitorAgent.Agent</AssemblyName>
+    <RootNamespace>ArtasTools.MonitorAgent.Agent</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ArtasTools.MonitorAgent.Abstractions\ArtasTools.MonitorAgent.Abstractions.csproj" />
+    <ProjectReference Include="..\ArtasTools.MonitorAgent.Context\ArtasTools.MonitorAgent.Context.csproj" />
+    <ProjectReference Include="..\ArtasTools.MonitorAgent.Core\ArtasTools.MonitorAgent.Core.csproj" />
+    <ProjectReference Include="..\ArtasTools.MonitorAgent.Roslyn\ArtasTools.MonitorAgent.Roslyn.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      MEAI 10.5.0 — та же версия, что в проекте Llm.
+      Контракт IChatClient: GetResponseAsync / ChatResponse.
+    -->
+    <PackageReference Include="Microsoft.Extensions.AI.Abstractions" Version="10.5.0" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.0" />
+  </ItemGroup>
+
+</Project>

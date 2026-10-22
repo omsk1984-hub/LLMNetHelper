@@ -1,0 +1,30 @@
+# .NET build artifacts
+bin/
+obj/
+*.user
+*.suo
+.vs/
+
+# Publish output
+publish/
+artifacts/
+
+# Локальные конфиги с секретами
+appsettings.Development.json
+appsettings.Local.json
+
+# Rider
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+.env
+.env.local
+!.env.example
+logs/*
+
+# Отчёты ArtasTools.MemReport
+reports/
+db/backups/

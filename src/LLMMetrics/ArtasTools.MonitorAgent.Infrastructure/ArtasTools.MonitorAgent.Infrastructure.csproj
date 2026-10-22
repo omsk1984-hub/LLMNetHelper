@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>ArtasTools.MonitorAgent.Infrastructure</AssemblyName>
+    <RootNamespace>ArtasTools.MonitorAgent.Infrastructure</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ArtasTools.MonitorAgent.Abstractions\ArtasTools.MonitorAgent.Abstractions.csproj" />
+    <ProjectReference Include="..\ArtasTools.MonitorAgent.Context\ArtasTools.MonitorAgent.Context.csproj" />
+    <ProjectReference Include="..\ArtasTools.MonitorAgent.Core\ArtasTools.MonitorAgent.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.0" />
+  </ItemGroup>
+
+</Project>

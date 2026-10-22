@@ -1,0 +1,17 @@
+<Project>
+
+  <!--
+    Фикстура-решение для тестов Roslyn.
+    Этот Directory.Build.props изолирует её от настроек основного решения:
+    отдельный TFM и отключённый NuGet Audit позволяют собирать её офлайн.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <NuGetAudit>false</NuGetAudit>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+</Project>

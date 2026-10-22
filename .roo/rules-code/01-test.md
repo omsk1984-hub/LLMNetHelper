@@ -1,0 +1,5 @@
+- все тесты выполняй через `dotnet test` для соответствующего решения:
+  - `dotnet test src/Writer/ArtasWriter.slnx`
+  - `dotnet test src/Stat/Stat.slnx`
+  - `dotnet test src/Reader/ArtasChart.sln`
+- запускай скрипты только через создание временных файлов (debug-скрипты)
