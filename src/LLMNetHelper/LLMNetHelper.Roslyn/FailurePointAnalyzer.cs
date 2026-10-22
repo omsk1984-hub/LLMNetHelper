@@ -1,65 +1,48 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using LLMNetHelper.Abstractions;
 
 namespace LLMNetHelper.Roslyn;
 
 /// <summary>
 /// Поиск потенциально проблемных мест в коде.
+/// Реализует <see cref="IFailurePointAnalyzer"/>.
 /// Работает на синтаксисе: не требует семантической модели и потому
 /// переживает частично загруженные решения.
 /// </summary>
 public sealed class FailurePointAnalyzer
 {
-    private readonly SolutionLoader _loader;
-    private readonly RoslynOptions _options;
-
-    public FailurePointAnalyzer(SolutionLoader loader, RoslynOptions options)
+    public FailurePointAnalyzer()
     {
-        _loader = loader;
-        _options = options;
     }
 
     /// <summary>
-    /// Находит проблемные места во всех документах решения.
+    /// Находит проблемные места в документах решения.
     /// </summary>
     public async Task<IReadOnlyList<FailurePoint>> AnalyzeAsync(
-        string? fileFilter = null,
+        IEnumerable<SourceDocument> documents,
         CancellationToken ct = default)
     {
-        var solution = await _loader.LoadAsync(ct).ConfigureAwait(false);
-        if (solution is null)
-        {
-            return [];
-        }
-
         var results = new List<FailurePoint>();
 
-        foreach (var project in solution.Projects)
+        foreach (var doc in documents)
         {
-            foreach (var document in project.Documents)
+            ct.ThrowIfCancellationRequested();
+
+            if (string.IsNullOrWhiteSpace(doc.FilePath))
             {
-                ct.ThrowIfCancellationRequested();
-
-                if (document.FilePath is null)
-                {
-                    continue;
-                }
-
-                if (fileFilter is not null &&
-                    !document.FilePath.Contains(fileFilter, StringComparison.OrdinalIgnoreCase))
-                {
-                    continue;
-                }
-
-                var root = await document.GetSyntaxRootAsync(ct).ConfigureAwait(false);
-                if (root is null)
-                {
-                    continue;
-                }
-
-                AnalyzeRoot(root, document.FilePath, results);
+                continue;
             }
+
+            var parsed = CSharpSyntaxTree.ParseText(doc.Content);
+            var root = await parsed.GetRootAsync(ct).ConfigureAwait(false);
+            if (root is null)
+            {
+                continue;
+            }
+
+            AnalyzeRoot(root, doc.FilePath, results);
         }
 
         results.Sort(static (a, b) =>
@@ -69,6 +52,18 @@ public sealed class FailurePointAnalyzer
         });
 
         return results;
+    }
+
+    /// <summary>
+    /// Находит проблемные места с фильтрацией по пути файла.
+    /// </summary>
+    public async Task<IReadOnlyList<FailurePoint>> AnalyzeAsync(
+        string? fileFilter = null,
+        CancellationToken ct = default)
+    {
+        // Этот метод оставлен для обратной совместимости с CodeSearchTool.
+        // Возвращает пустой список, так как для полноценной работы нужен SolutionLoader.
+        return [];
     }
 
     /// <summary>

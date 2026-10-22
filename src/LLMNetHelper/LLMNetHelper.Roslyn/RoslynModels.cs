@@ -25,21 +25,6 @@ public sealed record CodeSnippet(
     bool Truncated);
 
 /// <summary>
-/// Потенциально проблемное место: неперехваченное исключение, пустой catch, throw null.
-/// </summary>
-/// <param name="FileName">Путь к файлу относительно корня решения.</param>
-/// <param name="Line">Строка (1-based).</param>
-/// <param name="Kind">Тип проблемы: <c>empty-catch</c>, <c>catch-without-log</c>, <c>throw-null</c>, <c>catch-exception</c>.</param>
-/// <param name="ContainingMember">Член, в котором найдено место.</param>
-/// <param name="Snippet">Фрагмент кода для иллюстрации.</param>
-public sealed record FailurePoint(
-    string FileName,
-    int Line,
-    string Kind,
-    string ContainingMember,
-    string Snippet);
-
-/// <summary>
 /// Регистрация сервиса в DI-контейнере.
 /// </summary>
 /// <param name="ServiceType">Тип сервиса (<c>typeof(...)</c>).</param>

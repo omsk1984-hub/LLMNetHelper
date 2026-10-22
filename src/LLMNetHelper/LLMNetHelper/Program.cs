@@ -1,12 +1,9 @@
 using System.Text;
-using LLMNetHelper.Health;
-using LLMNetHelper.Abstractions;
-using LLMNetHelper.Scheduling;
+using LLMNetHelper;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 namespace LLMNetHelper;
 
@@ -35,19 +32,8 @@ internal static class Program
             })
             .Build();
 
-        // Парсинг аргументов командной строки
-        var agentOptions = host.Services.GetRequiredService<IOptions<AgentOptions>>().Value;
-
         var runNow = args.Contains("--run-now");
         var dryRun = args.Contains("--dry-run");
-        var llmProvider = args.FirstOrDefault(a => a.StartsWith("--llm-provider="))?.Split('=')[1];
-        var sinceArg = args.FirstOrDefault(a => a.StartsWith("--since="))?.Split('=')[1];
-        var hoursArg = args.FirstOrDefault(a => a.StartsWith("--hours="))?.Split('=')[1];
-
-        if (!string.IsNullOrEmpty(llmProvider))
-        {
-            Console.WriteLine($"[WARN] --llm-provider={llmProvider}: переопределение требует пересборки конфигурации");
-        }
 
         if (runNow || dryRun)
         {
@@ -55,32 +41,15 @@ internal static class Program
                 ? "[INFO] Dry-run: собираем факты и сводку, LLM не вызывается"
                 : "[INFO] Запуск по команде --run-now...");
 
-            DateTime? since = null;
-            if (!string.IsNullOrWhiteSpace(sinceArg) &&
-                DateTime.TryParse(sinceArg, null, System.Globalization.DateTimeStyles.AdjustToUniversal,
-                    out var parsedSince))
-            {
-                since = DateTime.SpecifyKind(parsedSince, DateTimeKind.Utc);
-            }
-
-            int? hours = null;
-            if (!string.IsNullOrWhiteSpace(hoursArg) && int.TryParse(hoursArg, out var parsedHours))
-            {
-                hours = parsedHours;
-            }
-
             var agentRunner = host.Services.GetRequiredService<IAgentRunner>();
 
             // Инициализация хранилища (WAL + миграции) обязательна ДО первого прогона.
-            // В планировщике её выполняет NightlyScheduleHostedService.RunOnceAsync,
-            // а ручной путь (--run-now/--dry-run) шёл мимо неё и падал с
-            // "SQLite Error 1: 'no such table: runs'" на пустой базе.
-            var factStore = host.Services.GetRequiredService<IFactStore>();
+            var factStore = host.Services.GetRequiredService<Abstractions.IFactStore>();
             await factStore.InitializeAsync(CancellationToken.None);
 
             try
             {
-                return await agentRunner.RunAsync(dryRun, catchUp: false, since, hours, CancellationToken.None);
+                return await agentRunner.RunAsync(dryRun, catchUp: false, since: null, hours: null, CancellationToken.None);
             }
             catch (OperationCanceledException)
             {
@@ -89,78 +58,8 @@ internal static class Program
             }
         }
 
-        // Health endpoint (Kestrel)
-        var healthPort = agentOptions.HealthPort;
-        var runner = Task.Run(async () => await host.RunAsync());
-
-        // Запускаем простой HTTP-сервер для healthcheck
-        var cts = new CancellationTokenSource();
-        var healthTask = RunHealthServerAsync(host, healthPort, cts);
-
-        await Task.WhenAll(runner, healthTask);
-
+        // Запуск хоста (включает NightlyScheduleHostedService + HealthServer)
+        await host.RunAsync();
         return 0;
-    }
-
-    private static async Task RunHealthServerAsync(IHost host, int port, CancellationTokenSource cts)
-    {
-        var healthState = host.Services.GetRequiredService<AgentHealthState>();
-        var listener = new System.Net.HttpListener();
-        listener.Prefixes.Add($"http://localhost:{port}/");
-        listener.Start();
-
-        Console.WriteLine($"[HEALTH] Listening on http://localhost:{port}/");
-
-        while (!cts.Token.IsCancellationRequested)
-        {
-            try
-            {
-                var ctx = await listener.GetContextAsync();
-                var path = ctx.Request.Url?.AbsolutePath;
-
-                if (path == "/health" || path == "/")
-                {
-                    var response = System.Text.Encoding.UTF8.GetBytes(
-                        $"{{\"status\":\"running\",\"port\":{port}}}");
-                    ctx.Response.StatusCode = 200;
-                    ctx.Response.ContentLength64 = response.Length;
-                    await ctx.Response.OutputStream.WriteAsync(response, cts.Token);
-                    ctx.Response.Close();
-                }
-                else if (path == "/status")
-                {
-                    var json = System.Text.Json.JsonSerializer.Serialize(healthState);
-                    var response = System.Text.Encoding.UTF8.GetBytes(json);
-                    ctx.Response.StatusCode = 200;
-                    ctx.Response.ContentLength64 = response.Length;
-                    await ctx.Response.OutputStream.WriteAsync(response, cts.Token);
-                    ctx.Response.Close();
-                }
-                else if (path == "/exit")
-                {
-                    Console.WriteLine("[HEALTH] /exit called — shutting down...");
-                    var response = System.Text.Encoding.UTF8.GetBytes(
-                        "{\"status\":\"shutting_down\"}");
-                    ctx.Response.StatusCode = 200;
-                    ctx.Response.ContentLength64 = response.Length;
-                    await ctx.Response.OutputStream.WriteAsync(response, cts.Token);
-                    ctx.Response.Close();
-                    cts.Cancel();
-                    break;
-                }
-                else
-                {
-                    ctx.Response.StatusCode = 404;
-                    ctx.Response.Close();
-                    continue;
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine($"[HEALTH] Error: {ex.Message}");
-            }
-        }
-
-        listener.Stop();
     }
 }

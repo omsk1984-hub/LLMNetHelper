@@ -7,19 +7,23 @@ namespace LLMNetHelper.Core.Snapshot;
 
 /// <summary>
 /// Формирование компактной сводки фактов для отправки в LLM.
-/// Порядок: метаданные → агрегаты → тренды → топ-N ошибок → дифф.
+/// Отвечает только за Markdown-рендеринг.
+/// Token budget применяется отдельным компонентом <see cref="ISnapshotBudgetEnforcer"/>.
 /// </summary>
 public class SnapshotBuilder
 {
-    private readonly AgentOptions _options;
+    private readonly IOptions<AgentOptions> _options;
     private readonly IFactStore _factStore;
+    private readonly ISnapshotBudgetEnforcer _budgetEnforcer;
 
     public SnapshotBuilder(
         IOptions<AgentOptions> options,
-        IFactStore factStore)
+        IFactStore factStore,
+        ISnapshotBudgetEnforcer budgetEnforcer)
     {
-        _options = options.Value;
+        _options = options;
         _factStore = factStore;
+        _budgetEnforcer = budgetEnforcer;
     }
 
     /// <summary>
@@ -76,7 +80,7 @@ public class SnapshotBuilder
         // 4. Топ-N уникальных ошибок
         var topErrors = lokiFacts.ErrorSamples
             .OrderByDescending(e => e.Count)
-            .Take(_options.TopErrorsLimit)
+            .Take(_options.Value.TopErrorsLimit)
             .ToList();
 
         if (topErrors.Count > 0)
@@ -87,8 +91,8 @@ public class SnapshotBuilder
             for (var i = 0; i < topErrors.Count; i++)
             {
                 var err = topErrors[i];
-                var sampleText = err.SampleText.Length > _options.MaxSampleChars
-                    ? err.SampleText.Substring(0, _options.MaxSampleChars) + "..."
+                var sampleText = err.SampleText.Length > _options.Value.MaxSampleChars
+                    ? err.SampleText.Substring(0, _options.Value.MaxSampleChars) + "..."
                     : err.SampleText;
 
                 sb.AppendLine($"### {i + 1}. [{err.Count}x] {err.Signature.Substring(0, Math.Min(40, err.Signature.Length))}...");
@@ -135,15 +139,12 @@ public class SnapshotBuilder
             sb.AppendLine();
         }
 
-        // Применяем TokenBudgetGuard
+        // Применяем TokenBudgetGuard через интерфейс
         var snapshotText = sb.ToString();
-        var budgetResult = TokenBudgetGuard.EnforceBudget(
+        return _budgetEnforcer.Enforce(
             snapshotText,
-            _options.TopErrorsLimit,
-            _options.MaxSampleChars,
-            topErrors,
-            _options);
-
-        return budgetResult;
+            _options.Value.TopErrorsLimit,
+            _options.Value.MaxSampleChars,
+            topErrors);
     }
 }

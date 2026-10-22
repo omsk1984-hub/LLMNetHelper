@@ -3,25 +3,29 @@ using LLMNetHelper.Abstractions;
 namespace LLMNetHelper.Core.Snapshot;
 
 /// <summary>
-/// TokenBudgetGuard: оценка и обрезка сводки по бюджету токенов.
+/// Реализация <see cref="ISnapshotBudgetEnforcer"/>.
 /// Порядок обрезки: sample_text → TopErrorsLimit → редкие ошибки.
 /// Агрегаты не режутся никогда.
 /// </summary>
-public static class TokenBudgetGuard
+public sealed class TokenBudgetGuard : ISnapshotBudgetEnforcer
 {
+    private static readonly TokenBudgetGuard _instance = new();
+
+    /// <summary>
+    /// Экземпляр для статического доступа (тесты).
+    /// </summary>
+    public static TokenBudgetGuard Instance => _instance;
+
     // Ориентировочная оценка: ~4 символа на токен (для английского/русского)
     private const int CharsPerToken = 4;
     private const int MaxTokens = 6000; // безопасный бюджет для компактной сводки
 
-    /// <summary>
-    /// Проверяет бюджет и применяет обрезку при необходимости.
-    /// </summary>
-    public static SnapshotResult EnforceBudget(
+    /// <inheritdoc />
+    public SnapshotResult Enforce(
         string snapshotText,
         int topErrorsLimit,
         int maxSampleChars,
-        List<ErrorSample> errorSamples,
-        AgentOptions options)
+        List<ErrorSample> errorSamples)
     {
         var estimatedTokens = snapshotText.Length / CharsPerToken;
 
@@ -37,14 +41,14 @@ public static class TokenBudgetGuard
             return new ErrorSample
             {
                 Signature = s.Signature,
+                SampleText = text,
+                Count = s.Count,
+                FirstSeen = s.FirstSeen,
+                LastSeen = s.LastSeen,
                 Lvl = s.Lvl,
                 Job = s.Job,
                 Logger = s.Logger,
-                Symbol = s.Symbol,
-                FirstSeen = s.FirstSeen,
-                LastSeen = s.LastSeen,
-                Count = s.Count,
-                SampleText = text
+                Symbol = s.Symbol
             };
         }).ToList();
 
@@ -77,7 +81,6 @@ public static class TokenBudgetGuard
         int? topErrorsLimit = null,
         bool keepFrequentOnly = false)
     {
-        // Упрощённая перегенерация: просто обрезаем текст если он слишком длинный
         var estimatedTokens = snapshotText.Length / CharsPerToken;
         if (estimatedTokens <= MaxTokens)
             return snapshotText;
@@ -90,11 +93,3 @@ public static class TokenBudgetGuard
         return snapshotText;
     }
 }
-
-/// <summary>
-/// Результат применения TokenBudgetGuard.
-/// </summary>
-public sealed record SnapshotResult(
-    string SnapshotText,
-    List<ErrorSample> ErrorSamples,
-    bool WasTrimmed);

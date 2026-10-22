@@ -3,6 +3,7 @@ using LLMNetHelper.Agent;
 using LLMNetHelper.Agent.Orchestration;
 using LLMNetHelper.CodeChange;
 using LLMNetHelper.Context;
+using LLMNetHelper.Core.Collection;
 using LLMNetHelper.Core.Snapshot;
 using LLMNetHelper.Core.Storage;
 using LLMNetHelper.Health;
@@ -12,6 +13,7 @@ using LLMNetHelper.Infrastructure.Prometheus;
 using LLMNetHelper.Infrastructure.Reporting;
 using LLMNetHelper.Llm;
 using LLMNetHelper.Roslyn;
+using LLMNetHelper.Running;
 using LLMNetHelper.Scheduling;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -63,7 +65,9 @@ public static class DependencyInjection
         services.AddSingleton<IPrometheusClient, PrometheusHttpClient>();
 
         // --- Ядро: сводка и отчётность ---
+        services.AddSingleton<ISnapshotBudgetEnforcer, TokenBudgetGuard>();
         services.AddSingleton<SnapshotBuilder>();
+        services.AddSingleton<IFactCollectorFactory, FactCollectorFactory>();
         services.AddSingleton<IReportWriter>(sp =>
         {
             var options = sp.GetRequiredService<IOptions<AgentOptions>>().Value;
@@ -94,12 +98,29 @@ public static class DependencyInjection
         // --- Применение правок ---
         services.AddCodeChange(codeChangeOptions);
 
-        // --- Прогон ---
+        // --- Шаги прогона ---
+        services.AddSingleton<IRunStep, CollectLokiStep>();
+        services.AddSingleton<IRunStep, CollectPrometheusStep>();
+        services.AddSingleton<IRunStep, BuildSnapshotStep>();
+        services.AddSingleton<IRunStep, CollectContextStep>();
+        services.AddSingleton<IRunStep, DescribeCodeStep>();
+        services.AddSingleton<IRunStep, DiagnoseStep>();
+        services.AddSingleton<IRunStep, PlanFixStep>();
+        services.AddSingleton<IRunStep, ApplyChangesStep>();
+        services.AddSingleton<IRunStep, GenerateReportStep>();
+
+        // --- Пайплайн и прогон ---
+        services.AddSingleton<IAgentPipeline, AgentPipeline>();
         services.AddSingleton<IAgentRunner, AgentRunner>();
 
         // --- Хостинг ---
         services.AddHostedService<NightlyScheduleHostedService>();
         services.AddSingleton<AgentHealthState>();
+
+        // Health port из конфига
+        var agentOptionsConfig = configuration.GetSection("Agent").Get<AgentOptions>() ?? new AgentOptions();
+        services.AddKeyedSingleton("HealthPort", agentOptionsConfig.HealthPort.ToString());
+        services.AddHostedService<HealthServer>();
 
         return services;
     }

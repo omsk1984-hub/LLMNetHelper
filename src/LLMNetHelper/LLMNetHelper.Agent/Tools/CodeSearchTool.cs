@@ -286,7 +286,7 @@ public sealed class CodeFailurePointsTool : IAgentTool
 
         foreach (var p in points)
         {
-            sb.AppendLine($"[{p.Kind}] {p.FileName}:{p.Line} в {p.ContainingMember} — {p.Snippet}");
+            sb.AppendLine($"[{p.Type}] {p.FileName}:{p.Line} в {p.Member} — {p.Description}");
         }
 
         return sb.ToString();

@@ -6,7 +6,7 @@ namespace LLMNetHelper.Core.Collection;
 /// <summary>
 /// Сбор фактов из Prometheus: P1-P9 запросы из плана.
 /// </summary>
-public class PrometheusFactCollector
+public class PrometheusFactCollector : FactCollector<MetricFact, PrometheusFacts>
 {
     private readonly IPrometheusClient _client;
     private readonly PrometheusOptions _options;
@@ -19,10 +19,7 @@ public class PrometheusFactCollector
         _options = options.Value;
     }
 
-    /// <summary>
-    /// Собирает все факты из Prometheus за окно.
-    /// </summary>
-    public async Task<PrometheusFacts> CollectAsync(DateTime from, DateTime to, CancellationToken ct = default)
+    protected override async Task<PrometheusFacts> CollectCoreAsync(DateTime from, DateTime to, CancellationToken ct)
     {
         var metricFacts = new List<MetricFact>();
         var alerts = new List<Dictionary<string, object>>();
@@ -70,7 +67,7 @@ public class PrometheusFactCollector
             });
         }
 
-        // P7: dotnet_exceptions_total (если экспортируется)
+        // P7: dotnet_exceptions_total
         var exceptions = await _client.QueryAsync("sum(rate(dotnet_exceptions_total[1h]))", ct);
         if (exceptions.HasValue)
         {
@@ -95,7 +92,7 @@ public class PrometheusFactCollector
         }
         else
         {
-            monitoringHealth.LastDotnetMetricAge = TimeSpan.FromHours(24); // не найдено
+            monitoringHealth.LastDotnetMetricAge = TimeSpan.FromHours(24);
         }
 
         return new PrometheusFacts(metricFacts, alerts, monitoringHealth);
@@ -105,7 +102,6 @@ public class PrometheusFactCollector
     {
         var facts = new List<MetricFact>();
 
-        // Instant
         var instant = await _client.QueryAsync("dotnet_process_memory_working_set_bytes", ct);
         if (instant.HasValue)
         {
@@ -118,7 +114,6 @@ public class PrometheusFactCollector
             });
         }
 
-        // Range для тренда
         var points = await _client.QueryRangeAsync(
             "dotnet_process_memory_working_set_bytes", from, to, TimeSpan.FromMinutes(15), ct);
 
@@ -177,21 +172,18 @@ public class PrometheusFactCollector
 
     private async Task<List<MetricFact>> CollectGen2HeapTrendAsync(DateTime from, DateTime to, CancellationToken ct)
     {
-        var facts = new List<MetricFact>();
-
         var instant = await _client.QueryAsync("dotnet_gc_heap_size_bytes{generation=\"gen2\"}", ct);
         if (instant.HasValue)
         {
-            facts.Add(new MetricFact
+            return [new MetricFact
             {
                 Name = "dotnet_gc_heap_size_bytes_gen2",
                 Value = instant.Value,
                 WindowFrom = from.ToString("o"),
                 WindowTo = to.ToString("o")
-            });
+            }];
         }
-
-        return facts;
+        return [];
     }
 
     /// <summary>
@@ -223,7 +215,6 @@ public class PrometheusFactCollector
         var slope = (n * sumXY - sumX * sumY) / denom;
         var intercept = (sumY - slope * sumX) / n;
 
-        // R²
         var ssTot = sumY2 - (sumY * sumY) / n;
         var ssRes = 0.0;
         for (var i = 0; i < n; i++)
@@ -233,8 +224,6 @@ public class PrometheusFactCollector
         }
 
         var r2 = ssTot > 1e-10 ? 1 - ssRes / ssTot : 0;
-
-        // slopePerHour: предполагаем что шаг ~15 минут, значит за час ~4 точки
         var slopePerHour = slope * (60.0 / 15.0);
 
         return (slopePerHour, r2);

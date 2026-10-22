@@ -1,5 +1,6 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using LLMNetHelper.Abstractions;
 
 namespace LLMNetHelper.Roslyn;
 
@@ -30,6 +31,8 @@ public sealed class StructureAnalyzer
         var typeCount = 0;
         var methodCount = 0;
 
+        var documents = new List<SourceDocument>();
+
         foreach (var project in solution.Projects)
         {
             projects.Add(project.Name);
@@ -51,10 +54,13 @@ public sealed class StructureAnalyzer
 
                 typeCount += root.DescendantNodes().OfType<TypeDeclarationSyntax>().Count();
                 methodCount += root.DescendantNodes().OfType<MethodDeclarationSyntax>().Count();
+
+                var text = await document.GetTextAsync(ct).ConfigureAwait(false);
+                documents.Add(new SourceDocument(document.FilePath, text.ToString()));
             }
         }
 
-        var failures = await new FailurePointAnalyzer(_loader, new RoslynOptions()).AnalyzeAsync(null, ct)
+        var failures = await new FailurePointAnalyzer().AnalyzeAsync(documents, ct)
             .ConfigureAwait(false);
 
         projects.Sort(StringComparer.Ordinal);

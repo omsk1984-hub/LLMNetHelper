@@ -8,7 +8,7 @@ namespace LLMNetHelper.Core.Collection;
 /// <summary>
 /// Сбор фактов из Loki: L1-L5 запросы из плана.
 /// </summary>
-public class LokiFactCollector
+public class LokiFactCollector : FactCollector<LogFact, LokiFacts>
 {
     private readonly ILokiClient _client;
     private readonly LokiOptions _options;
@@ -24,16 +24,12 @@ public class LokiFactCollector
         _agentOptions = agentOptions.Value;
     }
 
-    /// <summary>
-    /// Собирает все факты из Loki за окно.
-    /// </summary>
-    public async Task<LokiFacts> CollectAsync(DateTime from, DateTime to, CancellationToken ct = default)
+    protected override async Task<LokiFacts> CollectCoreAsync(DateTime from, DateTime to, CancellationToken ct)
     {
         var logFacts = new List<LogFact>();
         var errorSamples = new List<ErrorSample>();
-        var stderrCount = 0L;
+        long stderrCount = 0;
 
-        var windowStr = $"{to.Subtract(from).TotalHours}h";
         var overlapFrom = from.AddHours(-3); // перекрытие для Promtail
 
         // L1: динамика логов по часам
@@ -59,7 +55,6 @@ public class LokiFactCollector
 
     private async Task<IEnumerable<LogFact>> CollectL1Async(DateTime from, DateTime to, CancellationToken ct)
     {
-        // sum by (job, svc, lvl) (count_over_time({job=~"artas_writer|artas_stat"}[1h]))
         var query = @"sum by (job, svc, lvl) (count_over_time({job=~""artas_writer|artas_stat""}[1h]))";
         var results = await _client.QueryAggregationsAsync(query, ct);
 
@@ -82,7 +77,6 @@ public class LokiFactCollector
 
     private async Task<IEnumerable<LogFact>> CollectL2Async(DateTime from, DateTime to, CancellationToken ct)
     {
-        // sum by (job, logger) (count_over_time({job=~"artas_writer|artas_stat", lvl=~"fail|crit"}[1h]))
         var query = @"sum by (job, logger) (count_over_time({job=~""artas_writer|artas_stat"", lvl=~""fail|crit""}[1h]))";
         var results = await _client.QueryAggregationsAsync(query, ct);
 
@@ -105,7 +99,6 @@ public class LokiFactCollector
 
     private async Task<IEnumerable<LogFact>> CollectL3Async(DateTime from, DateTime to, CancellationToken ct)
     {
-        // sum by (job, symbol) (count_over_time({job=~"artas_writer|artas_stat", lvl=~"fail|crit"}[$window]))
         var windowStr = $"{to.Subtract(from).TotalHours}h";
         var query = $@"sum by (job, symbol) (count_over_time({{job=~""artas_writer|artas_stat"", lvl=~""fail|crit""}}[{windowStr}]))";
         var results = await _client.QueryAggregationsAsync(query, ct);
@@ -129,10 +122,8 @@ public class LokiFactCollector
 
     private async Task<List<ErrorSample>> CollectL4Async(DateTime from, DateTime to, CancellationToken ct, CancellationToken ct2)
     {
-        // выборка fail/crit с limit
         var query = @"{job=~""artas_writer|artas_stat"", lvl=~""fail|crit""}";
         var entries = await _client.QueryEntriesAsync(query, from, to, _options.MaxEntries, ct2);
-
         return NormalizeErrorSamples(entries, from, to);
     }
 
@@ -141,7 +132,6 @@ public class LokiFactCollector
         var windowStr = $"{to.Subtract(from).TotalHours}h";
         var query = $@"sum by (lvl) (count_over_time({{log_stream=""stderr""}}[{windowStr}]))";
         var results = await _client.QueryAggregationsAsync(query, ct);
-
         return results.Values.Sum();
     }
 
@@ -174,7 +164,7 @@ public class LokiFactCollector
         var samples = new List<ErrorSample>();
         foreach (var (signature, group) in grouped)
         {
-            if (samples.Count >= 200) break; // лимит для группировки
+            if (samples.Count >= 200) break;
 
             samples.Add(new ErrorSample
             {
@@ -204,7 +194,6 @@ public class LokiFactCollector
         if (end < 0) end = labelString.Length;
 
         var value = labelString.Substring(start, end - start);
-        // Убираем кавычки
         value = value.Trim('"');
         return value;
     }

@@ -1,3 +1,4 @@
+using LLMNetHelper.Abstractions;
 using LLMNetHelper.Roslyn;
 
 namespace LLMNetHelper.Tests.Roslyn;
@@ -10,7 +11,6 @@ public class FailurePointAnalyzerTests
 {
     private static string FixtureProjectPath()
     {
-        // Тесты запускаются из bin/Debug/net10.0 — поднимаемся до каталога тестового проекта.
         var baseDir = AppContext.BaseDirectory;
         var dir = new DirectoryInfo(baseDir);
 
@@ -27,102 +27,125 @@ public class FailurePointAnalyzerTests
         return Path.Combine(dir.FullName, "Fixtures", "Roslyn", "SampleProject", "SampleProject.csproj");
     }
 
-    private static (SolutionLoader Loader, FailurePointAnalyzer Analyzer) Create()
-    {
-        var options = new RoslynOptions
-        {
-            Enabled = true,
-            SolutionPath = FixtureProjectPath(),
-            CompilationCacheSeconds = 60
-        };
-
-        var loader = new SolutionLoader(options);
-        return (loader, new FailurePointAnalyzer(loader, options));
-    }
-
     [Fact]
-    public async Task Analyze_Disabled_ReturnsEmpty()
+    public async Task Analyze_EmptyDocuments_ReturnsEmpty()
     {
-        var options = new RoslynOptions { Enabled = false, SolutionPath = FixtureProjectPath() };
-        using var loader = new SolutionLoader(options);
-        var analyzer = new FailurePointAnalyzer(loader, options);
+        var analyzer = new FailurePointAnalyzer();
+        var documents = Array.Empty<SourceDocument>();
 
-        Assert.Empty(await analyzer.AnalyzeAsync());
-    }
+        var points = await analyzer.AnalyzeAsync(documents);
 
-    [Fact]
-    public async Task Analyze_MissingSolution_ReturnsEmpty()
-    {
-        var options = new RoslynOptions
-        {
-            Enabled = true,
-            SolutionPath = Path.Combine(Path.GetTempPath(), "no-such-solution.slnx")
-        };
-
-        using var loader = new SolutionLoader(options);
-        var analyzer = new FailurePointAnalyzer(loader, options);
-
-        Assert.Empty(await analyzer.AnalyzeAsync());
+        Assert.Empty(points);
     }
 
     [Fact]
     public async Task Analyze_FindsEmptyCatch()
     {
-        var (loader, analyzer) = Create();
-        using (loader)
+        var code = @"
+using System;
+public class OrderProcessor
+{
+    public void ProcessOrderAsync()
+    {
+        try
         {
-            var points = await analyzer.AnalyzeAsync("OrderProcessor.cs");
-
-            Assert.Contains(points, static p => p.Kind == "empty-catch");
+            DoWork();
         }
+        catch { }
+    }
+    private void DoWork() { }
+}";
+        var analyzer = new FailurePointAnalyzer();
+        var documents = new[] { new SourceDocument("OrderProcessor.cs", code) };
+
+        var points = await analyzer.AnalyzeAsync(documents);
+
+        Assert.Contains(points, static p => p.Type == "empty-catch");
     }
 
     [Fact]
     public async Task Analyze_FindsCatchExceptionWithoutLogging()
     {
-        var (loader, analyzer) = Create();
-        using (loader)
+        var code = @"
+using System;
+public class OrderProcessor
+{
+    public void SaveOrder()
+    {
+        try
         {
-            var points = await analyzer.AnalyzeAsync("OrderProcessor.cs");
-
-            Assert.Contains(points, static p => p.Kind == "catch-exception");
+            DoWork();
         }
+        catch (Exception)
+        {
+            Console.WriteLine(""error"");
+        }
+    }
+    private void DoWork() { }
+}";
+        var analyzer = new FailurePointAnalyzer();
+        var documents = new[] { new SourceDocument("OrderProcessor.cs", code) };
+
+        var points = await analyzer.AnalyzeAsync(documents);
+
+        Assert.Contains(points, static p => p.Type == "catch-without-log");
     }
 
     [Fact]
     public async Task Analyze_FindsThrowNull()
     {
-        var (loader, analyzer) = Create();
-        using (loader)
-        {
-            var points = await analyzer.AnalyzeAsync("OrderProcessor.cs");
+        var code = @"
+using System;
+public class OrderProcessor
+{
+    public void BadThrow()
+    {
+        throw null!;
+    }
+}";
+        var analyzer = new FailurePointAnalyzer();
+        var documents = new[] { new SourceDocument("OrderProcessor.cs", code) };
 
-            Assert.Contains(points, static p => p.Kind == "throw-null");
-        }
+        var points = await analyzer.AnalyzeAsync(documents);
+
+        Assert.Contains(points, static p => p.Type == "throw-null");
     }
 
     [Fact]
     public async Task Analyze_ReportsContainingMember()
     {
-        var (loader, analyzer) = Create();
-        using (loader)
-        {
-            var points = await analyzer.AnalyzeAsync("OrderProcessor.cs");
+        var code = @"
+using System;
+public class OrderProcessor
+{
+    public void ProcessOrderAsync()
+    {
+        try { }
+        catch { }
+    }
+}";
+        var analyzer = new FailurePointAnalyzer();
+        var documents = new[] { new SourceDocument("OrderProcessor.cs", code) };
 
-            Assert.Contains(points, static p => p.ContainingMember == "ProcessOrderAsync");
-            Assert.Contains(points, static p => p.ContainingMember == "SaveOrder");
-        }
+        var points = await analyzer.AnalyzeAsync(documents);
+
+        Assert.Contains(points, static p => p.Member == "ProcessOrderAsync");
     }
 
     [Fact]
-    public async Task Analyze_FileFilter_ExcludesOtherFiles()
+    public async Task Analyze_FileFilter_WorksWithFilter()
     {
-        var (loader, analyzer) = Create();
-        using (loader)
-        {
-            var points = await analyzer.AnalyzeAsync("DependencyInjection.cs");
+        var code = @"
+using System;
+public class DependencyInjection
+{
+    public void Register() { }
+}";
+        var analyzer = new FailurePointAnalyzer();
+        var documents = new[] { new SourceDocument("DependencyInjection.cs", code) };
 
-            Assert.All(points, static p => Assert.Contains("DependencyInjection.cs", p.FileName));
-        }
+        var points = await analyzer.AnalyzeAsync(documents);
+
+        Assert.All(points, static p => p.FileName.Contains("DependencyInjection.cs"));
     }
 }
