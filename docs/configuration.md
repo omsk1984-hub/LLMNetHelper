@@ -5,7 +5,7 @@
 1. **Переменные окружения процесса** — задаются до запуска (флаги раннера
    `-Roslyn` / `-CodeChange` ставят переменные ДО загрузки `.env` и потому
    выигрывают у файла).
-2. **`src/LLMMetrics/.env`** — локальный файл агента (в `.gitignore`).
+2. **`src/LLMNetHelper/.env`** — локальный файл агента (в `.gitignore`).
    Парсер примитивный: `KEY=VALUE`, инлайн-комментарии НЕ срезаются,
    кавычки обрезаются, уже заданная переменная НЕ перезаписывается.
 3. **`appsettings.json`** рядом с сборкой — факультативно; если есть,
@@ -14,8 +14,8 @@
 4. **Дефолты классов опций** — последний слой.
 
 Единственный шаблон конфигурации в репозитории —
-`src/LLMMetrics/.env.example`. Копирование:
-`Copy-Item src/LLMMetrics/.env.example src/LLMMetrics/.env`.
+`src/LLMNetHelper/.env.example`. Копирование:
+`Copy-Item src/LLMNetHelper/.env.example src/LLMNetHelper/.env`.
 
 ## Маппинг имён
 
@@ -36,7 +36,7 @@
 
 ## Пути: относительные разрешаются от корня репозитория
 
-При запуске через `run_LLMMetrics.ps1` относительные каталожные пути
+При запуске через `run_LLMNetHelper.ps1` относительные каталожные пути
 нормализуются от корня репозитория и передаются процессу абсолютными.
 Это касается: `AGENT__REPORTSDIR`, `AGENT__DATABASEPATH`,
 `Context__Sources__local-folder__Path`, `ROSLYN__SOLUTIONPATH`,
@@ -122,7 +122,7 @@ Health-порт должен быть свободен. `HttpListener` на `htt
 | Параметр | Env | Дефолт | Описание |
 |---|---|---|---|
 | `Enabled` | `ROSLYN__ENABLED` | `false` | Безопасный дефолт. Включение раннером: `-Roslyn` |
-| `SolutionPath` | `ROSLYN__SOLUTIONPATH` | `src\LLMMetrics\LLMNetHelper.slnx` | Решение/проект для MSBuildWorkspace |
+| `SolutionPath` | `ROSLYN__SOLUTIONPATH` | `src\LLMNetHelper\LLMNetHelper.slnx` | Решение/проект для MSBuildWorkspace |
 | `CompilationCacheSeconds` | `ROSLYN__COMPILATIONCACHESECONDS` | `300` | Кэш компиляции |
 | `MaxSourceChars` | `ROSLYN__MAXSOURCECHARS` | `20000` | Лимит исходника на чтение |
 | `MaxSearchResults` | `ROSLYN__MAXSEARCHRESULTS` | `50` | Лимит результатов поиска |
@@ -141,7 +141,7 @@ Health-порт должен быть свободен. `HttpListener` на `htt
 | `BuildTimeoutSeconds` | `CODECHANGE__BUILDTIMEOUTSECONDS` | `600` | Таймаут сборки |
 | `TestTimeoutSeconds` | `CODECHANGE__TESTTIMEOUTSECONDS` | `900` | Таймаут тестов |
 | `SkipTests` | `CODECHANGE__SKIPTESTS` | `false` | Пропускать тесты |
-| `SolutionPath` | `CODECHANGE__SOLUTIONPATH` | `src\LLMMetrics\LLMNetHelper.slnx` | Решение для build/test |
+| `SolutionPath` | `CODECHANGE__SOLUTIONPATH` | `src\LLMNetHelper\LLMNetHelper.slnx` | Решение для build/test |
 | `GitExecutable` | `CODECHANGE__GITEXECUTABLE` | `git` | Путь к git |
 | `DotnetExecutable` | `CODECHANGE__DOTNETEXECUTABLE` | `dotnet` | Путь к dotnet |
 | `BranchPrefix` | `CODECHANGE__BRANCHPREFIX` | `fix/ai-` | Префикс веток правок |

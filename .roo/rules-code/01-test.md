@@ -1,7 +1,7 @@
 - все тесты выполняй через `dotnet test` для решения проекта:
-  - `dotnet test src/LLMMetrics/LLMNetHelper.slnx`
-  - точечно: `dotnet test src/LLMMetrics/ArtasTools.MonitorAgent.Tests/ArtasTools.MonitorAgent.Tests.csproj`
-  - SK-паритет: `dotnet test src/LLMMetrics/ArtasTools.MonitorAgent.Orchestration.SemanticKernel.Tests/ArtasTools.MonitorAgent.Orchestration.SemanticKernel.Tests.csproj`
-  - либо через раннер: `run_LLMMetrics.ps1 -Test`
+  - `dotnet test src/LLMNetHelper/LLMNetHelper.slnx`
+  - точечно: `dotnet test src/LLMNetHelper/LLMNetHelper.Tests/LLMNetHelper.Tests.csproj`
+  - SK-паритет: `dotnet test src/LLMNetHelper/LLMNetHelper.Orchestration.SemanticKernel.Tests/LLMNetHelper.Orchestration.SemanticKernel.Tests.csproj`
+  - либо через раннер: `run_LLMNetHelper.ps1 -Test`
 - все тесты офлайн: сеть и Docker для их прохода не требуются
 - запускай скрипты только через создание временных файлов (debug-скрипты)

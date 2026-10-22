@@ -1,6 +1,6 @@
-# ArtasTools.MonitorAgent — Docker-развёртывание
+# LLMNetHelper — Docker-развёртывание
 #
-# Билд-контекст: src/LLMMetrics (корень с решением LLMNetHelper.slnx).
+# Билд-контекст: src/LLMNetHelper (корень с решением LLMNetHelper.slnx).
 # Файл конфигурации: ./monitor-agent.env (шаблон — monitor-agent.env.example).
 #
 # Запуск:
@@ -16,7 +16,7 @@
 services:
   monitor-agent:
     build:
-      context: ../../src/LLMMetrics
+      context: ../../src/LLMNetHelper
       dockerfile: ../../deploy/monitor-agent/Dockerfile
     image: artas-monitor-agent:local
     container_name: artas_monitor_agent

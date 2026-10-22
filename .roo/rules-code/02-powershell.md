@@ -10,7 +10,7 @@
 ftype Microsoft.PowerShellScript.1 = "C:\Windows\System32\notepad.exe" "%1"
 ```
 
-Из-за этого команда вида `.\run_LLMMetrics.ps1` **не исполняется**, а передаётся
+Из-за этого команда вида `.\run_LLMNetHelper.ps1` **не исполняется**, а передаётся
 диспетчеру ассоциаций Windows, который открывает файл в **Блокноте**.
 Дополнительно PowerShell стартует с `[Console]::OutputEncoding = CP866`, тогда
 как читатель вывода ожидает UTF-8 — кириллица превращается в «кракозябры».
@@ -43,7 +43,7 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File "<путь_к_скрипту>" <п
 - `-File` / оператор `&` — принципиально важно: заставляет PowerShell **исполнять**
   файл, минуя ассоциацию `.ps1` → notepad.
 - Путь указывать относительно корня репозитория `d:/work/LLMNetHelper`
-  (например `src/LLMMetrics/run_LLMMetrics.ps1`), т.к. `cwd` фиксирован рабочей папкой.
+  (например `src/LLMNetHelper/run_LLMNetHelper.ps1`), т.к. `cwd` фиксирован рабочей папкой.
 - Параметры скрипта передавать после пути к скрипту.
 - Для автоматических (неинтерактивных) запусков всегда добавлять `-NoPause`,
   иначе скрипт будет ждать нажатия клавиши и терминал «зависнет».
@@ -66,7 +66,7 @@ Windows PowerShell 5.1 `$OutputEncoding` вообще `US-ASCII (20127)`. Без
 
 Правило действует для **всех** `.ps1` в репозитории, в том числе:
 
-- `src/LLMMetrics/run_LLMMetrics.ps1`
+- `src/LLMNetHelper/run_LLMNetHelper.ps1`
 - `deploy/monitor-agent/run_MonitorAgent.ps1`
 
 ## Примеры
@@ -74,13 +74,13 @@ Windows PowerShell 5.1 `$OutputEncoding` вообще `US-ASCII (20127)`. Без
 Одиночный прогон агента (DryRun) без пересборки:
 
 ```
-pwsh -NoProfile -Command "[Console]::OutputEncoding=[Text.Encoding]::UTF8; $OutputEncoding=[Text.Encoding]::UTF8; chcp 65001 > $null; & 'src/LLMMetrics/run_LLMMetrics.ps1' -NoPause -NoBuild"
+pwsh -NoProfile -Command "[Console]::OutputEncoding=[Text.Encoding]::UTF8; $OutputEncoding=[Text.Encoding]::UTF8; chcp 65001 > $null; & 'src/LLMNetHelper/run_LLMNetHelper.ps1' -NoPause -NoBuild"
 ```
 
 Показать разрешённую конфигурацию:
 
 ```
-pwsh -NoProfile -Command "[Console]::OutputEncoding=[Text.Encoding]::UTF8; $OutputEncoding=[Text.Encoding]::UTF8; chcp 65001 > $null; & 'src/LLMMetrics/run_LLMMetrics.ps1' -NoPause -Info"
+pwsh -NoProfile -Command "[Console]::OutputEncoding=[Text.Encoding]::UTF8; $OutputEncoding=[Text.Encoding]::UTF8; chcp 65001 > $null; & 'src/LLMNetHelper/run_LLMNetHelper.ps1' -NoPause -Info"
 ```
 
 ## ВАЖНО: кириллица при ВЛОЖЕННЫХ .ps1 (`& script.ps1`)
@@ -116,7 +116,7 @@ UTF-8-префикс в `pwsh -Command` лечит только вывод **с�
 Родительский pwsh (уже в UTF-8) читает эти байты как UTF-8 → кириллица искажается
 («кракозябры»).
 
-Место, где выводит C#-код: `src/LLMMetrics/ArtasTools.MonitorAgent/Program.cs`
+Место, где выводит C#-код: `src/LLMNetHelper/LLMNetHelper/Program.cs`
 (`Console.WriteLine` / `Console.Error.WriteLine` для `[INFO]`, `[WARN]`,
 `[HEALTH]`).
 
@@ -133,8 +133,8 @@ Console.OutputEncoding = System.Text.Encoding.UTF8;
 
 ## Запрещено
 
-- `.\run_LLMMetrics.ps1` (уйдёт в Блокнот).
-- `run_LLMMetrics.ps1` (то же самое).
+- `.\run_LLMNetHelper.ps1` (уйдёт в Блокнот).
+- `run_LLMNetHelper.ps1` (то же самое).
 - `powershell -File ...` без установки `[Console]::OutputEncoding` — сломает
   кириллицу (особенно Windows PowerShell 5.1 с `$OutputEncoding = US-ASCII`).
 - Запуск без `-NoPause` в неинтерактивном контексте — терминал заблокируется на

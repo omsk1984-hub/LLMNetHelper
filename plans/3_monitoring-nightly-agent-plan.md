@@ -117,7 +117,7 @@ flowchart TD
 
 ```
 src/Tools/MonitorAgent/
-├── ArtasTools.MonitorAgent/                  # Worker Service (хостинг + планировщик)
+├── LLMNetHelper/                  # Worker Service (хостинг + планировщик)
 │   ├── Program.cs                            # Host, DI, режим --run-now / --dry-run
 │   ├── DependencyInjection.cs                # в т.ч. выбор LLM-провайдера
 │   ├── Options/
@@ -130,14 +130,14 @@ src/Tools/MonitorAgent/
 │   │   └── NightlyRunner.cs                  # один прогон: collect → snapshot → llm → report
 │   ├── Health/AgentHealthState.cs            # /health и /status для healthcheck
 │   └── appsettings.json / appsettings.example.json
-├── ArtasTools.MonitorAgent.Abstractions/     # контракты (зависимостей нет)
+├── LLMNetHelper.Abstractions/     # контракты (зависимостей нет)
 │   ├── ILokiClient.cs
 │   ├── IPrometheusClient.cs
 │   ├── IFactStore.cs
 │   ├── IAnalysisLlmClient.cs                 # единая LLM-абстракция (§10.1)
 │   ├── LlmRequest.cs / LlmCompletion.cs      # DTO контракта
 │   └── IReportWriter.cs
-├── ArtasTools.MonitorAgent.Core/             # логика без I/O-деталей
+├── LLMNetHelper.Core/             # логика без I/O-деталей
 │   ├── Collection/
 │   │   ├── LokiFactCollector.cs
 │   │   └── PrometheusFactCollector.cs
@@ -156,15 +156,15 @@ src/Tools/MonitorAgent/
 │   └── Reporting/
 │       ├── MarkdownReportRenderer.cs
 │       └── JsonReportRenderer.cs
-├── ArtasTools.MonitorAgent.Llm/              # только LLM-транспорты
+├── LLMNetHelper.Llm/              # только LLM-транспорты
 │   ├── CustomOpenAiCompatibleClient.cs       # реализация A (свой HttpClient)
 │   ├── MeaiLlmClient.cs                      # реализация B (Microsoft.Extensions.AI)
 │   └── LlmClientRegistration.cs              # AddMonitorAgentLlm(provider)
-├── ArtasTools.MonitorAgent.Infrastructure/   # прочий I/O
+├── LLMNetHelper.Infrastructure/   # прочий I/O
 │   ├── Loki/LokiHttpClient.cs
 │   ├── Prometheus/PrometheusHttpClient.cs
 │   └── Reporting/FileReportWriter.cs
-├── ArtasTools.MonitorAgent.Tests/            # xUnit (как у ReportAnalyzer)
+├── LLMNetHelper.Tests/            # xUnit (как у ReportAnalyzer)
 │   ├── Snapshot/SnapshotBuilderTests.cs
 │   ├── Snapshot/TokenBudgetGuardTests.cs
 │   ├── Snapshot/RedactorTests.cs
@@ -380,7 +380,7 @@ services.AddSingleton<IAnalysisLlmClient>(sp =>
 
 ### 10.3 Реализация B — `meai` (Microsoft.Extensions.AI)
 
-- Пакеты: `Microsoft.Extensions.AI` + провайдерский адаптер (`Microsoft.Extensions.AI.[OI]` либо иной `IChatClient`); зависимость **только** в `ArtasTools.MonitorAgent.Llm` — `Core` остаётся чистым.
+- Пакеты: `Microsoft.Extensions.AI` + провайдерский адаптер (`Microsoft.Extensions.AI.[OI]` либо иной `IChatClient`); зависимость **только** в `LLMNetHelper.Llm` — `Core` остаётся чистым.
 - `IChatClient` из DI, базовый клиент указывает на тот же [OI]-совместимый endpoint.
 - Структурированный ответ — `ChatResponseFormat.ForJsonSchema(...)` либо `GetResponseAsync<T>`; `Json` заполняется из разобранного объекта, `Text` — из сырого содержимого.
 - Middleware: `UseLogging()`, `UseOpenTelemetry()` (OTel-коллектор `artas_otel_collector:4317` уже есть в стеке), опционально `UseDistributedCache()`.
@@ -493,7 +493,7 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 # curl для healthcheck; mkdir /reports/monitoring
 # ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false LANG=C.UTF-8 TZ=UTC
-# ENTRYPOINT ["dotnet","ArtasTools.MonitorAgent.dll"]
+# ENTRYPOINT ["dotnet","LLMNetHelper.dll"]
 ```
 
 Обязательно:

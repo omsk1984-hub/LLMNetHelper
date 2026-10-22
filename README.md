@@ -13,26 +13,26 @@
 ## Архитектура
 
 ```
-ArtasTools.MonitorAgent.Abstractions              — контракты, без зависимостей
-ArtasTools.MonitorAgent.Core                      — сборка фактов, сводка, отчётность
-ArtasTools.MonitorAgent.Context                   — источники контекста (FileWalker, BM25)
-ArtasTools.MonitorAgent.Roslyn                    — анализ кода (SolutionLoader, AST, патчи)
-ArtasTools.MonitorAgent.CodeChange                — git + build/test + транзакция с откатом
-ArtasTools.MonitorAgent.Agent                     — инструменты, оркестратор, промпты
-ArtasTools.MonitorAgent.Llm                       — LLM-транспорты (custom + MEAI)
-ArtasTools.MonitorAgent.Infrastructure            — HTTP-клиенты, файловый I/O
-ArtasTools.MonitorAgent                           — Worker Service (хостинг + планировщик)
-ArtasTools.MonitorAgent.Tests                     — xUnit, офлайн
+LLMNetHelper.Abstractions              — контракты, без зависимостей
+LLMNetHelper.Core                      — сборка фактов, сводка, отчётность
+LLMNetHelper.Context                   — источники контекста (FileWalker, BM25)
+LLMNetHelper.Roslyn                    — анализ кода (SolutionLoader, AST, патчи)
+LLMNetHelper.CodeChange                — git + build/test + транзакция с откатом
+LLMNetHelper.Agent                     — инструменты, оркестратор, промпты
+LLMNetHelper.Llm                       — LLM-транспорты (custom + MEAI)
+LLMNetHelper.Infrastructure            — HTTP-клиенты, файловый I/O
+LLMNetHelper                           — Worker Service (хостинг + планировщик)
+LLMNetHelper.Tests                     — xUnit, офлайн
 ```
 
 **Опционально** (отключается флагом `-p:EnableSemanticKernel=false`):
 
 ```
-ArtasTools.MonitorAgent.Orchestration.SemanticKernel        — SK 1.81.0 оркестратор
-ArtasTools.MonitorAgent.Orchestration.SemanticKernel.Tests  — паритетные тесты
+LLMNetHelper.Orchestration.SemanticKernel        — SK 1.81.0 оркестратор
+LLMNetHelper.Orchestration.SemanticKernel.Tests  — паритетные тесты
 ```
 
-Все проекты входят в решение [`src/LLMMetrics/LLMNetHelper.slnx`](src/LLMMetrics/LLMNetHelper.slnx:1).
+Все проекты входят в решение [`src/LLMNetHelper/LLMNetHelper.slnx`](src/LLMNetHelper/LLMNetHelper.slnx:1).
 При `EnableSemanticKernel=false` SK-проекты компилируются пустыми (`Compile Remove`),
 поэтому `dotnet build` решения остаётся зелёным.
 
@@ -63,14 +63,14 @@ ChangeTransaction: ветка → AST-правка → build → test → commit
 
 ```powershell
 # .env из шаблона
-Copy-Item src/LLMMetrics/.env.example src/LLMMetrics/.env
+Copy-Item src/LLMNetHelper/.env.example src/LLMNetHelper/.env
 
 # Сборка и тесты
-dotnet build src/LLMMetrics/LLMNetHelper.slnx -c Release
-dotnet test  src/LLMMetrics/LLMNetHelper.slnx
+dotnet build src/LLMNetHelper/LLMNetHelper.slnx -c Release
+dotnet test  src/LLMNetHelper/LLMNetHelper.slnx
 
 # Запуск раннера (.ps1 ассоциирован с notepad — вызывать pwsh явно):
-pwsh -NoProfile -Command "[Console]::OutputEncoding=[Text.Encoding]::UTF8; $OutputEncoding=[Text.Encoding]::UTF8; chcp 65001 > $null; & 'src/LLMMetrics/run_LLMMetrics.ps1' -NoPause"
+pwsh -NoProfile -Command "[Console]::OutputEncoding=[Text.Encoding]::UTF8; $OutputEncoding=[Text.Encoding]::UTF8; chcp 65001 > $null; & 'src/LLMNetHelper/run_LLMNetHelper.ps1' -NoPause"
 ```
 
 ## Ключевые принципы
@@ -78,11 +78,11 @@ pwsh -NoProfile -Command "[Console]::OutputEncoding=[Text.Encoding]::UTF8; $Outp
 1. **Детерминированный сбор фактов.** Запросы к Loki и Prometheus зафиксированы
    в коде и версионируются. LLM не формирует их сам — иначе ночной прогон
    невоспроизводим, а расход токенов непредсказуем.
-2. **Белый список инструментов.** [`ToolRegistry`](ArtasTools.MonitorAgent.Agent/Tools/ToolRegistry.cs)
+2. **Белый список инструментов.** [`ToolRegistry`](LLMNetHelper.Agent/Tools/ToolRegistry.cs)
    отклоняет вызов инструмента вне реестра до выполнения.
-3. **Правки через AST, а не текст.** [`AstPatcher`](ArtasTools.MonitorAgent.Roslyn/AstPatcher.cs)
+3. **Правки через AST, а не текст.** [`AstPatcher`](LLMNetHelper.Roslyn/AstPatcher.cs)
    поддерживает только `ReplaceMethodBody` и `InsertNullCheck`.
-4. **Откат при любом провале.** [`ChangeTransaction`](ArtasTools.MonitorAgent.CodeChange/ChangeTransaction.cs)
+4. **Откат при любом провале.** [`ChangeTransaction`](LLMNetHelper.CodeChange/ChangeTransaction.cs)
    возвращает репозиторий в исходное состояние, если не прошла сборка или тесты.
 5. **Push не выполняется.** Только локальный коммит в ветку `fix/ai-{runId}`.
    Мерж — вручную после проверки.
@@ -95,10 +95,10 @@ pwsh -NoProfile -Command "[Console]::OutputEncoding=[Text.Encoding]::UTF8; $Outp
 
 ## Конфигурация
 
-Основной источник — переменные окружения из `src/LLMMetrics/.env`
-(шаблон [`src/LLMMetrics/.env.example`](src/LLMMetrics/.env.example:1));
+Основной источник — переменные окружения из `src/LLMNetHelper/.env`
+(шаблон [`src/LLMNetHelper/.env.example`](src/LLMNetHelper/.env.example:1));
 `appsettings.json` факультативен
-(пример — [`ArtasTools.MonitorAgent/appsettings.example.json`](ArtasTools.MonitorAgent/appsettings.example.json:1)).
+(пример — [`LLMNetHelper/appsettings.example.json`](LLMNetHelper/appsettings.example.json:1)).
 Полная справка — [`docs/configuration.md`](docs/configuration.md).
 
 ### Основное
@@ -131,9 +131,9 @@ pwsh -NoProfile -Command "[Console]::OutputEncoding=[Text.Encoding]::UTF8; $Outp
 | `Context:TotalCharsBudget` | `24000` | Общий бюджет символов |
 
 **Добавить новый источник** (Confluence, Jira, pgvector) — реализовать
-[`IContextSource`](ArtasTools.MonitorAgent.Abstractions/IContextSource.cs:1)
+[`IContextSource`](LLMNetHelper.Abstractions/IContextSource.cs:1)
 и добавить одну строку `services.AddContextSource<T>()` в
-[`DependencyInjection`](ArtasTools.MonitorAgent/DependencyInjection.cs:1).
+[`DependencyInjection`](LLMNetHelper/DependencyInjection.cs:1).
 Прикладной код не меняется.
 
 ### Анализ кода и правки
@@ -157,8 +157,8 @@ pwsh -NoProfile -Command "[Console]::OutputEncoding=[Text.Encoding]::UTF8; $Outp
 
 | Провайдер | `IAnalysisLlmClient` | `IChatClient` |
 |---|---|---|
-| `custom` (по умолчанию) | [`CustomOpenAiCompatibleClient`](ArtasTools.MonitorAgent.Llm/CustomOpenAiCompatibleClient.cs:1) | [`CustomLlmChatClient`](ArtasTools.MonitorAgent.Llm/CustomLlmChatClient.cs:1) — адаптер над тем же транспортом |
-| `meai` | [`MeaiLlmClient`](ArtasTools.MonitorAgent.Llm/MeaiLlmClient.cs:1) | тот же транспорт с семантикой MEAI 10.5.0 |
+| `custom` (по умолчанию) | [`CustomOpenAiCompatibleClient`](LLMNetHelper.Llm/CustomOpenAiCompatibleClient.cs:1) | [`CustomLlmChatClient`](LLMNetHelper.Llm/CustomLlmChatClient.cs:1) — адаптер над тем же транспортом |
+| `meai` | [`MeaiLlmClient`](LLMNetHelper.Llm/MeaiLlmClient.cs:1) | тот же транспорт с семантикой MEAI 10.5.0 |
 
 `CustomLlmChatClient` **не поддерживает tool calling на уровне протокола**:
 оркестратор получает текстовые ответы и разбирает запрос на вызов инструмента
@@ -170,7 +170,7 @@ pwsh -NoProfile -Command "[Console]::OutputEncoding=[Text.Encoding]::UTF8; $Outp
 Отключить (быстрее, без ~30 пакетов SK):
 
 ```bash
-dotnet build src/LLMMetrics/LLMNetHelper.slnx -p:EnableSemanticKernel=false
+dotnet build src/LLMNetHelper/LLMNetHelper.slnx -p:EnableSemanticKernel=false
 ```
 
 Выбор в рантайме:
@@ -180,7 +180,7 @@ dotnet build src/LLMMetrics/LLMNetHelper.slnx -p:EnableSemanticKernel=false
 ```
 
 **Важно:** `AddSemanticKernelOrchestrator()` пока **не вызывается** в
-[`DependencyInjection`](ArtasTools.MonitorAgent/DependencyInjection.cs:1) —
+[`DependencyInjection`](LLMNetHelper/DependencyInjection.cs:1) —
 выбор `semantic-kernel` в конфиге приведёт к `InvalidOperationException`
 с объяснением. Оркестратор реализован и покрыт тестами, но не подключён
 к Worker; подключение требует регистрации `IChatClient` в SK-ядре (см. §«Ограничения»
@@ -193,17 +193,17 @@ dotnet build src/LLMMetrics/LLMNetHelper.slnx -p:EnableSemanticKernel=false
 
 ```bash
 # Всё решение целиком
-dotnet test src/LLMMetrics/LLMNetHelper.slnx
+dotnet test src/LLMNetHelper/LLMNetHelper.slnx
 
 # Только агент (офлайн, без Docker)
-dotnet test src/LLMMetrics/ArtasTools.MonitorAgent.Tests/ArtasTools.MonitorAgent.Tests.csproj
+dotnet test src/LLMNetHelper/LLMNetHelper.Tests/LLMNetHelper.Tests.csproj
 
 # Только паритет SK-оркестратора
-dotnet test src/LLMMetrics/ArtasTools.MonitorAgent.Orchestration.SemanticKernel.Tests/ArtasTools.MonitorAgent.Orchestration.SemanticKernel.Tests.csproj
+dotnet test src/LLMNetHelper/LLMNetHelper.Orchestration.SemanticKernel.Tests/LLMNetHelper.Orchestration.SemanticKernel.Tests.csproj
 ```
 
 Все тесты офлайн — сеть и Docker не требуются. Актуальное количество показывает
-`dotnet test` решения; через раннер: `run_LLMMetrics.ps1 -Test`.
+`dotnet test` решения; через раннер: `run_LLMNetHelper.ps1 -Test`.
 
 ## Коды возврата
 

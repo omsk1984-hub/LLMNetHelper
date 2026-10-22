@@ -9,8 +9,8 @@
 
 ## 1. Причина миграции
 
-Сейчас в проектах [`Llm`](src/LLMMetrics/ArtasTools.MonitorAgent.Llm/ArtasTools.MonitorAgent.Llm.csproj:16) и
-[`Agent`](src/LLMMetrics/ArtasTools.MonitorAgent.Agent/ArtasTools.MonitorAgent.Agent.csproj:19) жёстко зафиксирована
+Сейчас в проектах [`Llm`](src/LLMNetHelper/LLMNetHelper.Llm/LLMNetHelper.Llm.csproj:16) и
+[`Agent`](src/LLMNetHelper/LLMNetHelper.Agent/LLMNetHelper.Agent.csproj:19) жёстко зафиксирована
 версия **9.0.0-preview.9.24556.5**. Это создаёт три проблемы:
 
 | Проблема | Последствие |
@@ -50,13 +50,13 @@
 
 | Файл | Изменение |
 |---|---|
-| [`Llm.csproj`](src/LLMMetrics/ArtasTools.MonitorAgent.Llm/ArtasTools.MonitorAgent.Llm.csproj:16) | `Microsoft.Extensions.AI`: preview.9 → **10.5.0**; `Microsoft.Extensions.AI.[OI]`: preview.9 → **10.5.0** |
-| [`Agent.csproj`](src/LLMMetrics/ArtasTools.MonitorAgent.Agent/ArtasTools.MonitorAgent.Agent.csproj:19) | `Microsoft.Extensions.AI.Abstractions`: preview.9 → **10.5.0** |
-| [`Llm.csproj`](src/LLMMetrics/ArtasTools.MonitorAgent.Llm/ArtasTools.MonitorAgent.Llm.csproj:18) | Проверить `System.Memory.Data`: при необходимости 8.0.1 → **10.0.3** (требование 10.5.0) |
+| [`Llm.csproj`](src/LLMNetHelper/LLMNetHelper.Llm/LLMNetHelper.Llm.csproj:16) | `Microsoft.Extensions.AI`: preview.9 → **10.5.0**; `Microsoft.Extensions.AI.[OI]`: preview.9 → **10.5.0** |
+| [`Agent.csproj`](src/LLMNetHelper/LLMNetHelper.Agent/LLMNetHelper.Agent.csproj:19) | `Microsoft.Extensions.AI.Abstractions`: preview.9 → **10.5.0** |
+| [`Llm.csproj`](src/LLMNetHelper/LLMNetHelper.Llm/LLMNetHelper.Llm.csproj:18) | Проверить `System.Memory.Data`: при необходимости 8.0.1 → **10.0.3** (требование 10.5.0) |
 
 **Проверка:** `dotnet restore` офлайн, отсутствие `NU1605`/`NU1608`.
 
-### Шаг 2 — Переписать [`MeaiLlmClient`](src/LLMMetrics/ArtasTools.MonitorAgent.Llm/MeaiLlmClient.cs:1)
+### Шаг 2 — Переписать [`MeaiLlmClient`](src/LLMNetHelper/LLMNetHelper.Llm/MeaiLlmClient.cs:1)
 
 Три изменения:
 
@@ -68,7 +68,7 @@
 Контракт `IAnalysisLlmClient.CompleteAsync(LlmRequest, CancellationToken)` **сохраняется** —
 это внутренний контракт проекта, он не зависит от версии MEAI.
 
-### Шаг 3 — Переписать [`NativeAgentOrchestrator`](src/LLMMetrics/ArtasTools.MonitorAgent.Agent/Orchestration/NativeAgentOrchestrator.cs:1)
+### Шаг 3 — Переписать [`NativeAgentOrchestrator`](src/LLMNetHelper/LLMNetHelper.Agent/Orchestration/NativeAgentOrchestrator.cs:1)
 
 1. `_chat.CompleteAsync(messages, cancellationToken: ct)` → `_chat.GetResponseAsync(messages, cancellationToken: ct)`.
 2. `completion.Message?.Text` → `response.Text` — **в двух местах** (диагностика, планирование).
@@ -76,7 +76,7 @@
 
 ### Шаг 4 — Обновить тестовый фейк
 
-В [`NativeAgentOrchestratorTests`](src/LLMMetrics/ArtasTools.MonitorAgent.Tests/Agent/NativeAgentOrchestratorTests.cs:18):
+В [`NativeAgentOrchestratorTests`](src/LLMNetHelper/LLMNetHelper.Tests/Agent/NativeAgentOrchestratorTests.cs:18):
 
 1. `ScriptedChatClient` реализует новый `IChatClient`:
    - `GetResponseAsync` вместо `CompleteAsync`;
@@ -94,9 +94,9 @@
 > полная пересборка (`--no-incremental`) упала с `NU1605` — но уже по **другой** причине:
 >
 > ```
-> ArtasTools.MonitorAgent.Roslyn -> Microsoft.CodeAnalysis.Workspaces.MSBuild 4.14.0
+> LLMNetHelper.Roslyn -> Microsoft.CodeAnalysis.Workspaces.MSBuild 4.14.0
 >   -> Microsoft.Build.Tasks.Core 17.14.28 -> System.CodeDom (>= 9.0.0)
-> ArtasTools.MonitorAgent.Roslyn -> Microsoft.CodeAnalysis.Workspaces.MSBuild 4.14.0
+> LLMNetHelper.Roslyn -> Microsoft.CodeAnalysis.Workspaces.MSBuild 4.14.0
 >   -> System.CodeDom (>= 7.0.0)        ← фактически резолвится 7.0.0
 > ```
 >
@@ -104,7 +104,7 @@
 > `System.CodeDom` нужен только на этапе загрузки решения (`MSBuildWorkspace`),
 > в рантайм агента не попадает.
 >
-> **Решение:** подавление **возвращено** в [`Directory.Build.props`](src/LLMMetrics/Directory.Build.props:16),
+> **Решение:** подавление **возвращено** в [`Directory.Build.props`](src/LLMNetHelper/Directory.Build.props:16),
 > но комментарий переписан: указана настоящая причина и отмечено, что прежняя (MEAI →
 > `System.Memory.Data` 8.0.1) устранена миграцией.
 >
@@ -114,8 +114,8 @@
 ### Шаг 6 — Полный прогон
 
 ```
-dotnet build src/LLMMetrics/ArtasTools.MonitorAgent.Tests/ArtasTools.MonitorAgent.Tests.csproj
-dotnet test  src/LLMMetrics/ArtasTools.MonitorAgent.Tests/ArtasTools.MonitorAgent.Tests.csproj
+dotnet build src/LLMNetHelper/LLMNetHelper.Tests/LLMNetHelper.Tests.csproj
+dotnet test  src/LLMNetHelper/LLMNetHelper.Tests/LLMNetHelper.Tests.csproj
 ```
 
 Ожидание: 135/135 тестов зелёные, как до миграции.

@@ -25,7 +25,7 @@ case "$1" in
         ;;
     run-now)
         echo "Выполнение однократного прогона..."
-        docker exec "$CONTAINER_NAME" dotnet ArtasTools.MonitorAgent.dll --run-now
+        docker exec "$CONTAINER_NAME" dotnet LLMNetHelper.dll --run-now
         ;;
     rebuild)
         echo "Пересборка и запуск..."

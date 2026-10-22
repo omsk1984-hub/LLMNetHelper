@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>LLMNetHelper.Agent</AssemblyName>
+    <RootNamespace>LLMNetHelper.Agent</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\LLMNetHelper.Abstractions\LLMNetHelper.Abstractions.csproj" />
+    <ProjectReference Include="..\LLMNetHelper.Context\LLMNetHelper.Context.csproj" />
+    <ProjectReference Include="..\LLMNetHelper.Core\LLMNetHelper.Core.csproj" />
+    <ProjectReference Include="..\LLMNetHelper.Roslyn\LLMNetHelper.Roslyn.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      MEAI 10.5.0 — та же версия, что в проекте Llm.
+      Контракт IChatClient: GetResponseAsync / ChatResponse.
+    -->
+    <PackageReference Include="Microsoft.Extensions.AI.Abstractions" Version="10.5.0" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.0" />
+  </ItemGroup>
+
+</Project>

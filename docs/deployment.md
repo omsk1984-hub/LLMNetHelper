@@ -2,10 +2,10 @@
 
 ## Хост (основной сценарий)
 
-Конфигурация: `src/LLMMetrics/.env` (шаблон — `src/LLMMetrics/.env.example`).
+Конфигурация: `src/LLMNetHelper/.env` (шаблон — `src/LLMNetHelper/.env.example`).
 
 ```powershell
-Copy-Item src/LLMMetrics/.env.example src/LLMMetrics/.env
+Copy-Item src/LLMNetHelper/.env.example src/LLMNetHelper/.env
 # вписать LLM__ENDPOINT / LLM__APIKEY / модель
 ```
 
@@ -14,13 +14,13 @@ Copy-Item src/LLMMetrics/.env.example src/LLMMetrics/.env
 Однократный прогон без LLM (проверка связности с Loki/Prometheus):
 
 ```powershell
-pwsh -NoProfile -Command "[Console]::OutputEncoding=[Text.Encoding]::UTF8; $OutputEncoding=[Text.Encoding]::UTF8; chcp 65001 > $null; & 'src/LLMMetrics/run_LLMMetrics.ps1' -NoPause"
+pwsh -NoProfile -Command "[Console]::OutputEncoding=[Text.Encoding]::UTF8; $OutputEncoding=[Text.Encoding]::UTF8; chcp 65001 > $null; & 'src/LLMNetHelper/run_LLMNetHelper.ps1' -NoPause"
 ```
 
 Демон с ночным расписанием (`Agent:RunAtUtc`) и health-эндпоинтом:
 
 ```powershell
-pwsh -NoProfile -Command "[Console]::OutputEncoding=[Text.Encoding]::UTF8; $OutputEncoding=[Text.Encoding]::UTF8; chcp 65001 > $null; & 'src/LLMMetrics/run_LLMMetrics.ps1' -NoPause -Daemon"
+pwsh -NoProfile -Command "[Console]::OutputEncoding=[Text.Encoding]::UTF8; $OutputEncoding=[Text.Encoding]::UTF8; chcp 65001 > $null; & 'src/LLMNetHelper/run_LLMNetHelper.ps1' -NoPause -Daemon"
 ```
 
 Остановка демона — только `-Stop` (останавливает свой PID из файла, чужие
@@ -60,7 +60,7 @@ pwsh -File deploy/monitor-agent/run_MonitorAgent.ps1 start
 создаётся составом Loki/Prometheus). Переопределяется переменной
 `MONITORING_NETWORK` без правки compose-файла.
 
-Билд-контекст образа — `src/LLMMetrics` (корень с `LLMNetHelper.slnx`).
+Билд-контекст образа — `src/LLMNetHelper` (корень с `LLMNetHelper.slnx`).
 `docs/` и `reports/` в контекст не входят и подключаются монтированием.
 
 NuGet в образе: корневой `nuget.config` находится ВНЕ билд-контекста и
@@ -76,6 +76,6 @@ Docker-развёртывание после переноса проекта в 
 может быть недоступен. Перед боевым использованием проверить:
 
 ```powershell
-docker build -f deploy/monitor-agent/Dockerfile src/LLMMetrics
+docker build -f deploy/monitor-agent/Dockerfile src/LLMNetHelper
 docker compose -f deploy/monitor-agent/docker-compose.monitor-agent.yml config
 ```

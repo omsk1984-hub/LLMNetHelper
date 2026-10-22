@@ -7,7 +7,7 @@
 
 ## 1. Постановка задачи
 
-Проект `ArtasTools.MonitorAgent` был вынесен из репозитория `D:\work\Artas2026`
+Проект `LLMNetHelper` был вынесен из репозитория `D:\work\Artas2026`
 в самостоятельный репозиторий `D:\work\LLMNetHelper`. Цель — убрать все связи со
 старым расположением: конфигурация, сборка, деплой и документы должны работать
 и обновляться внутри нового проекта. Каталог `docs/` создать, README обновить.
@@ -18,14 +18,14 @@
 
 | № | Файл | Строка | Проблема |
 |---|---|---|---|
-| B1 | `src/LLMMetrics/.env` | 67–68 | `AGENT__REPORTSDIR` / `AGENT__DATABASEPATH` → `D:\work\Artas2026\reports\monitoring` |
-| B2 | `src/LLMMetrics/.env` | 100 | `Context__Sources__local-folder__Path` → `D:\work\Artas2026\docs` (каталога нет в новом проекте) |
-| B3 | `src/LLMMetrics/.env` | 113, 130 | `ROSLYN__SOLUTIONPATH` / `CODECHANGE__SOLUTIONPATH` → `D:\work\Artas2026\src\Tools\ArtasTools.slnx` |
-| B4 | `src/LLMMetrics/.env` | 123 | `CODECHANGE__REPOSITORYPATH` → `D:\work\Artas2026` (агент правил бы чужой репозиторий) |
-| B5 | `src/LLMMetrics/.env` | 140 | `LOGS_DIR` → `D:\work\Artas2026\logs` |
-| B6 | `src/LLMMetrics/.env` | 125 | `CODECHANGE__BASEBRANCH=master` — проверено для старого репозитория, для нового не подтверждено |
-| B7 | `src/LLMMetrics/run_LLMMetrics.ps1` | 73 | `$Solution = Join-Path $ProjectRoot "src\Tools\ArtasTools.slnx"` — решения в новом репозитории нет |
-| B8 | `deploy/monitor-agent/Dockerfile` | 5–7 | `COPY ArtasTools.slnx`, `COPY ../LLMMetrics/`, `COPY Tools/` — невалидно: `..` вне билд-контекста, `Tools/` и `ArtasTools.slnx` отсутствуют |
+| B1 | `src/LLMNetHelper/.env` | 67–68 | `AGENT__REPORTSDIR` / `AGENT__DATABASEPATH` → `D:\work\Artas2026\reports\monitoring` |
+| B2 | `src/LLMNetHelper/.env` | 100 | `Context__Sources__local-folder__Path` → `D:\work\Artas2026\docs` (каталога нет в новом проекте) |
+| B3 | `src/LLMNetHelper/.env` | 113, 130 | `ROSLYN__SOLUTIONPATH` / `CODECHANGE__SOLUTIONPATH` → `D:\work\Artas2026\src\Tools\ArtasTools.slnx` |
+| B4 | `src/LLMNetHelper/.env` | 123 | `CODECHANGE__REPOSITORYPATH` → `D:\work\Artas2026` (агент правил бы чужой репозиторий) |
+| B5 | `src/LLMNetHelper/.env` | 140 | `LOGS_DIR` → `D:\work\Artas2026\logs` |
+| B6 | `src/LLMNetHelper/.env` | 125 | `CODECHANGE__BASEBRANCH=master` — проверено для старого репозитория, для нового не подтверждено |
+| B7 | `src/LLMNetHelper/run_LLMNetHelper.ps1` | 73 | `$Solution = Join-Path $ProjectRoot "src\Tools\ArtasTools.slnx"` — решения в новом репозитории нет |
+| B8 | `deploy/monitor-agent/Dockerfile` | 5–7 | `COPY ArtasTools.slnx`, `COPY ../LLMNetHelper/`, `COPY Tools/` — невалидно: `..` вне билд-контекста, `Tools/` и `ArtasTools.slnx` отсутствуют |
 | B9 | `deploy/monitor-agent/docker-compose.monitor-agent.yml` | 9 | `env_file: ./monitor-agent.env` — файла нет, compose падает на старте |
 | B10 | все `obj/` и `bin/` | — | Кеш NuGet/MSBuild с абсолютными путями `D:\work\Artas2026\...`; часть артефактов уже перегенерирована новым путём → смешанное состояние, восстановленное из кеша |
 
@@ -36,7 +36,7 @@
 
 | № | Файл | Строка | Проблема |
 |---|---|---|---|
-| S1 | `src/LLMMetrics/.env.example` | 108–109, 150, 169, 185, 197, 203–206 | Те же абсолютные пути старого проекта в эталонном шаблоне |
+| S1 | `src/LLMNetHelper/.env.example` | 108–109, 150, 169, 185, 197, 203–206 | Те же абсолютные пути старого проекта в эталонном шаблоне |
 | S2 | `README.md` | 29, 157, 180 | Ссылки на `src/Tools/ArtasTools.slnx` как на решение проекта |
 | S3 | `README.md` | 179 | «191 тест: 145 + 8 + 20 + 18» — сумма включает тесты чужих проектов старого решения |
 | S4 | `.roo/rules/01-general.md` | 1, 17–23, 47 | «Правила проекта Artas2026», каталог логов `D:\work\Artas2026\logs`, корень `d:/work/Artas2026` |
@@ -52,10 +52,10 @@ S7 — не косметика. Промпт — часть рантайм-по�
 
 | Объект | Почему ок |
 |---|---|
-| `run_LLMMetrics.ps1`: `$PSScriptRoot`, `$ProjectRoot = ..\..` | Относительные, корректно разрешаются в новом корне |
-| `run_LLMMetrics.ps1`: fallback `-Test` на прямые csproj | Уже заложен, но маскирует B7 — после починки должен перестать срабатывать |
+| `run_LLMNetHelper.ps1`: `$PSScriptRoot`, `$ProjectRoot = ..\..` | Относительные, корректно разрешаются в новом корне |
+| `run_LLMNetHelper.ps1`: fallback `-Test` на прямые csproj | Уже заложен, но маскирует B7 — после починки должен перестать срабатывать |
 | `nuget.config`, `nuget.offline.config`, `nuget.online.config` | `nuget.offline.config` указывает на глобальный кеш `C:\Users\Dionis\.nuget\packages` — он машинный, не проектный, переноса не требует |
-| `src/LLMMetrics/Directory.Build.props`, `global.json` | Без путей к другому репозиторию |
+| `src/LLMNetHelper/Directory.Build.props`, `global.json` | Без путей к другому репозиторию |
 | Все 13 `.csproj` | ProjectReference — относительные |
 | Тесты Roslyn (`CodeAnalysisTests`, `FailurePointAnalyzerTests`) | Фикстуры ищутся подъёмом от `AppContext.BaseDirectory`, плюс `Fixtures/Roslyn/SampleProject` копируется в выходной каталог |
 | `appsettings.example.json` | Дефолты относительные (`./reports/monitoring`, `docs`, пустые `SolutionPath`/`RepositoryPath`) — эталон автономности, брать за основу |
@@ -67,14 +67,14 @@ S7 — не косметика. Промпт — часть рантайм-по�
 
 ### R1. Собственное решение вместо `ArtasTools.slnx`
 
-Создать `src/LLMMetrics/LLMNetHelper.slnx` со всеми 13 проектами. Обоснование:
+Создать `src/LLMNetHelper/LLMNetHelper.slnx` со всеми 13 проектами. Обоснование:
 проект автономен, `dotnet build`/`dotnet test` должны работать от корня репозитория
 без внешних зависимостей; формат `.slnx` уже принят в команде (использовался в
 старом решении) и поддерживается SDK 10.0.401.
 
 Альтернатива — решение в корне репозитория (`LLMNetHelper.slnx` рядом с `src/`) —
 удобнее для CI, но отдаляет файл от проектов. Выбираем вариант внутри
-`src/LLMMetrics`, ближе к существующему layout и к `Directory.Build.props`.
+`src/LLMNetHelper`, ближе к существующему layout и к `Directory.Build.props`.
 
 ### R2. Относительные пути в конфигурации + нормализация в раннере
 
@@ -86,7 +86,7 @@ S7 — не косметика. Промпт — часть рантайм-по�
 Решение в два слоя:
 1. В `.env` / `.env.example` — значения, привязанные к новому корню, но
    записанные так, чтобы их понимал и хост, и контейнер.
-2. В `run_LLMMetrics.ps1` — функция нормализации: если значение опции
+2. В `run_LLMNetHelper.ps1` — функция нормализации: если значение опции
    каталога относительное, разворачивать от `$ProjectRoot` и передавать в процесс
    уже абсолютным. Это устраняет сам класс ошибок «запустил из другого каталога —
    ушёл отчётами вбок» и делает `.env` переносимым между машинами.
@@ -96,7 +96,7 @@ S7 — не косметика. Промпт — часть рантайм-по�
 
 ### R3. `LOGS_DIR` — удалить как мёртвую конфигурацию
 
-В новом проекте нет Writer/Stat/Promtail. В `run_LLMMetrics.ps1` `LOGS_DIR`
+В новом проекте нет Writer/Stat/Promtail. В `run_LLMNetHelper.ps1` `LOGS_DIR`
 используется ровно в одном месте — печать в `-Info`. Вывод агента пишется в
 `$AgentLogDir = $ReportsDir\logs`. Переменная создаёт ложное ожидание общего
 лог-каталога. Предложение: удалить `LOGS_DIR` из `.env` и `.env.example`, убрать
@@ -116,7 +116,7 @@ S7 — не косметика. Промпт — часть рантайм-по�
 
 `Dockerfile` нерабочий в принципе (п. B8), а `docker-compose` требует внешней
 сети `monitoring_artas_monitoring`, которой в новом проекте нет. Два варианта:
-привести к консистентному состоянию сейчас (билд-контекст `src/LLMMetrics`,
+привести к консистентному состоянию сейчас (билд-контекст `src/LLMNetHelper`,
 своё решение, `monitor-agent.env.example`, сеть сделать настраиваемой) или
 явно помечать docker-контур как «не проверен после переноса». Предлагаем
 первый: частичная правка хуже, чем осознанная.
@@ -129,9 +129,9 @@ flowchart TD
         direction TB
         ROOT["Корень репозитория"]
         DOCS["docs/<br/>маркдаун-документация"]
-        SLN["src/LLMMetrics/LLMNetHelper.slnx<br/>13 проектов"]
-        ENVF["src/LLMMetrics/.env<br/>пути без привязки к диску"]
-        RUNNER["run_LLMMetrics.ps1<br/>нормализует пути от ProjectRoot"]
+        SLN["src/LLMNetHelper/LLMNetHelper.slnx<br/>13 проектов"]
+        ENVF["src/LLMNetHelper/.env<br/>пути без привязки к диску"]
+        RUNNER["run_LLMNetHelper.ps1<br/>нормализует пути от ProjectRoot"]
         REPORTS["reports/monitoring<br/>отчёты + facts.db + logs"]
 
         ROOT --> DOCS
@@ -152,12 +152,12 @@ flowchart TD
 
 ### Этап 1. Сборка и решение
 
-1.1. Создать `src/LLMMetrics/LLMNetHelper.slnx` со всеми 13 проектами
+1.1. Создать `src/LLMNetHelper/LLMNetHelper.slnx` со всеми 13 проектами
      (`Abstractions`, `Core`, `Context`, `Roslyn`, `CodeChange`, `Agent`, `Llm`,
      `Infrastructure`, `MonitorAgent`, `Tests`, `Orchestration.SemanticKernel`,
      `Orchestration.SemanticKernel.Tests` + фикстура-проект не входит — он
      тестовая данных, не сборочная единица; проверить состав по `dotnet sln add`).
-1.2. `run_LLMMetrics.ps1:73` — заменить `$Solution` на
+1.2. `run_LLMNetHelper.ps1:73` — заменить `$Solution` на
      `Join-Path $ScriptDir "LLMNetHelper.slnx"`.
 1.3. Проверить, что `-p:EnableSemanticKernel=false` продолжает компилировать
      SK-проекты пустыми в новом решении.
@@ -177,7 +177,7 @@ flowchart TD
 
 ### Этап 3. Раннер и нормализация путей
 
-3.1. Добавить в `run_LLMMetrics.ps1` разрешение относительных каталожных опций
+3.1. Добавить в `run_LLMNetHelper.ps1` разрешение относительных каталожных опций
      от `$ProjectRoot` до передачи в процесс.
 3.2. Убедиться, что `-Info` печатает уже разрешённые абсолютные пути и
      `Test-Path` для каждого.
@@ -193,7 +193,7 @@ flowchart TD
 
 ### Этап 5. Деплой
 
-5.1. `Dockerfile`: билд-контекст `src/LLMMetrics`, корректные `COPY`, восстановление
+5.1. `Dockerfile`: билд-контекст `src/LLMNetHelper`, корректные `COPY`, восстановление
      по своему решению, офлайн-restore.
 5.2. `docker-compose.monitor-agent.yml`: создать `monitor-agent.env.example`,
      сеть сделать настраиваемой через `.env`-переменную compose.
@@ -201,7 +201,7 @@ flowchart TD
 
 ### Этап 6. Очистка артефактов
 
-6.1. Удалить все `bin/` и `obj/` в `src/LLMMetrics` (устраняет B10 и кеш
+6.1. Удалить все `bin/` и `obj/` в `src/LLMNetHelper` (устраняет B10 и кеш
      со старыми путями).
 6.2. `dotnet restore` + `dotnet build -c Release` по новому решению.
 
@@ -226,11 +226,11 @@ flowchart TD
 
 ### Этап 8. Верификация
 
-8.1. `dotnet test src/LLMMetrics/LLMNetHelper.slnx` — ожидаемо 145 + 8 SK-тестов.
-8.2. `run_LLMMetrics.ps1 -Info` — все пути указывают в новый корень и существуют.
-8.3. `run_LLMMetrics.ps1 -Check` — поведение при недоступных Loki/Prometheus
+8.1. `dotnet test src/LLMNetHelper/LLMNetHelper.slnx` — ожидаемо 145 + 8 SK-тестов.
+8.2. `run_LLMNetHelper.ps1 -Info` — все пути указывают в новый корень и существуют.
+8.3. `run_LLMNetHelper.ps1 -Check` — поведение при недоступных Loki/Prometheus
      (ожидается корректный отказ, не падение).
-8.4. `run_LLMMetrics.ps1` в `-DryRun` — отчёт пишется в новый `reports/monitoring`.
+8.4. `run_LLMNetHelper.ps1` в `-DryRun` — отчёт пишется в новый `reports/monitoring`.
 8.5. Регрессионный grep `Artas2026|src[/\\]Tools` по всему репозиторию, кроме
      `plans/` и `bin|obj` — ожидается ноль совпадений.
 8.6. Проверка отсутствия обращений к `D:\work\Artas2026` во время прогона
@@ -241,7 +241,7 @@ flowchart TD
 | Риск | Митигция |
 |---|---|
 | Очистка `bin/obj` удалит результаты прогонов, если отчёты лежали внутри дерева | Отчёты по конфигу вне дерева (`reports/` в игноре); проверить перед удалением |
-| `-p:EnableSemanticKernel=false` мог быть прописан в старом `Directory.Build.props` уровня `src/Tools` | Проверить наличие условия в самих SK-csproj; при отсутствии — перенести в `src/LLMMetrics/Directory.Build.props` |
+| `-p:EnableSemanticKernel=false` мог быть прописан в старом `Directory.Build.props` уровня `src/Tools` | Проверить наличие условия в самих SK-csproj; при отсутствии — перенести в `src/LLMNetHelper/Directory.Build.props` |
 | Изменение промпта сломает существующие тесты `NativeAgentOrchestratorTests` / `AgentPromptBuilder`-ассерты | Делать изменение вместе с тестами, прогонять этап 8.1 сразу после этапа 4 |
 | Относительные пути в `.env` поведут себя иначе при запуске не через раннер | Нормализация в раннере + явное предупреждение в комментариях `.env`; для прямого `dotnet run` рекомендовать абсолютные значения |
 | Docker-контур нельзя проверить без поднятого мониторинга | Ограничиться `docker build` и статической валидацией compose; явно зафиксировать в README, что рантайм-проверка не выполнялась |
@@ -249,9 +249,9 @@ flowchart TD
 
 ## 7. Что требуется от заказчика
 
-1. Подтвердить имя и расположение решения (`src/LLMMetrics/LLMNetHelper.slnx`).
+1. Подтвердить имя и расположение решения (`src/LLMNetHelper/LLMNetHelper.slnx`).
 2. Подтвердить удаление `LOGS_DIR` (R3) либо указать новый общий лог-каталог.
-3. Решить судьбу имён сборок: оставлять `ArtasTools.MonitorAgent.*` или
+3. Решить судьбу имён сборок: оставлять `LLMNetHelper.*` или
    переименовывать в `LLMNetHelper.*` (переименование — отдельная работа:
    namespaces, 13 csproj, тесты, документы; в текущий план не входит).
 4. Решить, нужен ли docker-контур сейчас (этап 5) или помечаем как непроверенный.

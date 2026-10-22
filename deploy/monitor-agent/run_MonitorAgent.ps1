@@ -43,7 +43,7 @@ function Show-Logs {
 
 function Run-Now {
     Write-Host "Выполнение однократного прогона..."
-    docker exec "$ContainerName" dotnet ArtasTools.MonitorAgent.dll --run-now
+    docker exec "$ContainerName" dotnet LLMNetHelper.dll --run-now
 }
 
 function Rebuild {

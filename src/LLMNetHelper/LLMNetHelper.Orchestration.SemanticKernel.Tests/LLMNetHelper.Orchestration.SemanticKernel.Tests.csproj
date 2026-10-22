@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Тесты SK-оркестратора. Проект включается условно, как и сам SK-оркестратор:
+    при EnableSemanticKernel=false тестов нет вовсе.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsTestProject>true</IsTestProject>
+    <AssemblyName>LLMNetHelper.Orchestration.SemanticKernel.Tests</AssemblyName>
+    <RootNamespace>LLMNetHelper.Orchestration.SemanticKernel.Tests</RootNamespace>
+
+    <EnableSemanticKernel Condition="'$(EnableSemanticKernel)' == ''">true</EnableSemanticKernel>
+    <DefineConstants Condition="'$(EnableSemanticKernel)' == 'true'">$(DefineConstants);SK_ENABLED</DefineConstants>
+    <NoWarn>$(NoWarn);NU1603</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(EnableSemanticKernel)' == 'true'">
+    <ProjectReference Include="..\LLMNetHelper.Orchestration.SemanticKernel\LLMNetHelper.Orchestration.SemanticKernel.csproj" />
+    <ProjectReference Include="..\LLMNetHelper.Agent\LLMNetHelper.Agent.csproj" />
+    <ProjectReference Include="..\LLMNetHelper.Abstractions\LLMNetHelper.Abstractions.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(EnableSemanticKernel)' == 'true'">
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.0.2">
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.13.0" />
+  </ItemGroup>
+
+  <!-- При выключенном SK компилировать нечего -->
+  <ItemGroup Condition="'$(EnableSemanticKernel)' != 'true'">
+    <Compile Remove="**\*.cs" />
+  </ItemGroup>
+
+</Project>

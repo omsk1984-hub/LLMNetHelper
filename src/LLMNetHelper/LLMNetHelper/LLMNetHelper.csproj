@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>LLMNetHelper</AssemblyName>
+    <RootNamespace>LLMNetHelper</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\LLMNetHelper.Abstractions\LLMNetHelper.Abstractions.csproj" />
+    <ProjectReference Include="..\LLMNetHelper.Core\LLMNetHelper.Core.csproj" />
+    <ProjectReference Include="..\LLMNetHelper.Llm\LLMNetHelper.Llm.csproj" />
+    <ProjectReference Include="..\LLMNetHelper.Infrastructure\LLMNetHelper.Infrastructure.csproj" />
+    <ProjectReference Include="..\LLMNetHelper.Context\LLMNetHelper.Context.csproj" />
+    <ProjectReference Include="..\LLMNetHelper.Roslyn\LLMNetHelper.Roslyn.csproj" />
+    <ProjectReference Include="..\LLMNetHelper.CodeChange\LLMNetHelper.CodeChange.csproj" />
+    <ProjectReference Include="..\LLMNetHelper.Agent\LLMNetHelper.Agent.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="appsettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="appsettings.example.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+</Project>

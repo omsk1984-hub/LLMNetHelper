@@ -2,22 +2,22 @@
 
 ## Слои проектов
 
-Решение: `src/LLMMetrics/LLMNetHelper.slnx` (12 проектов).
+Решение: `src/LLMNetHelper/LLMNetHelper.slnx` (12 проектов).
 
 | Проект | Назначение |
 |---|---|
-| `ArtasTools.MonitorAgent.Abstractions` | Контракты и модели. Зависимостей нет |
-| `ArtasTools.MonitorAgent.Core` | Сбор фактов, сводка, анализ, отчётность, хранилище |
-| `ArtasTools.MonitorAgent.Context` | Источники контекста: обход файлов, чанкинг, BM25-ранжирование |
-| `ArtasTools.MonitorAgent.Roslyn` | Анализ кода: загрузка решения, AST, поиск, граф вызовов |
-| `ArtasTools.MonitorAgent.CodeChange` | Git, сборка/тесты, транзакция правки с откатом |
-| `ArtasTools.MonitorAgent.Agent` | Инструменты, реестр, оркестраторы, промпты |
-| `ArtasTools.MonitorAgent.Llm` | LLM-транспорты: `custom` и `meai` |
-| `ArtasTools.MonitorAgent.Infrastructure` | HTTP-клиенты Loki/Prometheus, файловый вывод отчётов |
-| `ArtasTools.MonitorAgent` | Worker Service: хостинг, планировщик, health-эндпоинт |
-| `ArtasTools.MonitorAgent.Tests` | xUnit, полностью офлайн |
-| `ArtasTools.MonitorAgent.Orchestration.SemanticKernel` | Опциональный SK-оркестратор |
-| `ArtasTools.MonitorAgent.Orchestration.SemanticKernel.Tests` | Паритетные тесты SK-оркестратора |
+| `LLMNetHelper.Abstractions` | Контракты и модели. Зависимостей нет |
+| `LLMNetHelper.Core` | Сбор фактов, сводка, анализ, отчётность, хранилище |
+| `LLMNetHelper.Context` | Источники контекста: обход файлов, чанкинг, BM25-ранжирование |
+| `LLMNetHelper.Roslyn` | Анализ кода: загрузка решения, AST, поиск, граф вызовов |
+| `LLMNetHelper.CodeChange` | Git, сборка/тесты, транзакция правки с откатом |
+| `LLMNetHelper.Agent` | Инструменты, реестр, оркестраторы, промпты |
+| `LLMNetHelper.Llm` | LLM-транспорты: `custom` и `meai` |
+| `LLMNetHelper.Infrastructure` | HTTP-клиенты Loki/Prometheus, файловый вывод отчётов |
+| `LLMNetHelper` | Worker Service: хостинг, планировщик, health-эндпоинт |
+| `LLMNetHelper.Tests` | xUnit, полностью офлайн |
+| `LLMNetHelper.Orchestration.SemanticKernel` | Опциональный SK-оркестратор |
+| `LLMNetHelper.Orchestration.SemanticKernel.Tests` | Паритетные тесты SK-оркестратора |
 
 Зависимости направлены строго вниз: `Agent` → `Core`/`Context`/`Roslyn` →
 `Abstractions`. `Abstractions` не знает ни о чём.

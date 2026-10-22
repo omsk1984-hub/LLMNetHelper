@@ -3,9 +3,9 @@
 ## Автономность репозитория
 
 - Репозиторий не зависит от других репозиториев и внешних решений.
-  Единственное решение проекта — `src/LLMMetrics/LLMNetHelper.slnx`.
+  Единственное решение проекта — `src/LLMNetHelper/LLMNetHelper.slnx`.
 - Пути в конфигурации (`.env`) — относительные от корня репозитория;
-  раннер `run_LLMMetrics.ps1` нормализует их до абсолютных перед запуском
+  раннер `run_LLMNetHelper.ps1` нормализует их до абсолютных перед запуском
   процесса агента. Абсолютные пути с дисками в `.env` не использовать.
 - Исторические документы происхождения проекта (из репозитория Artas2026) —
   в `plans/`, помечены как архивные; как актуальную конфигурацию не читать.
@@ -45,7 +45,7 @@ pwsh -NoProfile -Command "[Console]::OutputEncoding=[Text.Encoding]::UTF8; $Outp
 
 Подробности — `.roo/rules-code/02-powershell.md`.
 
-## Тесты: только через `dotnet test src/LLMMetrics/LLMNetHelper.slnx`
+## Тесты: только через `dotnet test src/LLMNetHelper/LLMNetHelper.slnx`
 
 См. `.roo/rules-code/01-test.md`.
 
@@ -54,7 +54,7 @@ pwsh -NoProfile -Command "[Console]::OutputEncoding=[Text.Encoding]::UTF8; $Outp
 - **Запрещено** останавливать/убивать любые процессы (MonitorAgent-демон,
   docker-контейнеры, Loki/Prometheus и т.п.) без **явного** разрешения
   пользователя в текущей сессии.
-- Исключение: `run_LLMMetrics.ps1 -Stop` — останавливает ТОЛЬКО процесс,
+- Исключение: `run_LLMNetHelper.ps1 -Stop` — останавливает ТОЛЬКО процесс,
   запущенный самим скриптом (PID из файла); сам флаг и есть разрешение.
 - Диагностика выполняется **только в режиме чтения**: логи, `netstat`,
   `Get-Process`, HTTP-GET, `docker ps/logs` (без `down/stop`).

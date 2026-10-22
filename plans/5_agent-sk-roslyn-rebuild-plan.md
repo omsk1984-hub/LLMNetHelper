@@ -2,12 +2,12 @@
 
 # Перестройка LLM-агента: Semantic Kernel + Roslyn + источники контекста
 
-> План изменения существующего проекта [`src/LLMMetrics/`](src/LLMMetrics) с «ночного отчётчика» на
+> План изменения существующего проекта [`src/LLMNetHelper/`](src/LLMNetHelper) с «ночного отчётчика» на
 > **агент, который диагностирует инцидент, читает код через Roslyn, находит контекст в документации,
 > предлагает и применяет правку в отдельной ветке, проверяет сборкой и тестами, коммитит**.
 
 Исходные документы: [`plans/01.md`](plans/01.md:1) (SK + Roslyn), [`plans/02.md`](plans/02.md:1) (внешние источники / RAG),
-текущее состояние — [`IMPLEMENTATION_REPORT.md`](src/LLMMetrics/IMPLEMENTATION_REPORT.md:1),
+текущее состояние — [`IMPLEMENTATION_REPORT.md`](src/LLMNetHelper/IMPLEMENTATION_REPORT.md:1),
 предшественник — [`3_monitoring-nightly-agent-plan.md`](plans/3_monitoring-nightly-agent-plan.md:1).
 
 ---
@@ -15,40 +15,40 @@
 ## 1. Отправная точка: что есть сейчас
 
 Проект собран из 6 проектов, `net10.0`, собирается без ошибок. Это **конвейер, а не агент**:
-[`NightlyRunner.RunAsync()`](src/LLMMetrics/ArtasTools.MonitorAgent/NightlyRunner.cs:41) делает
+[`NightlyRunner.RunAsync()`](src/LLMNetHelper/LLMNetHelper/NightlyRunner.cs:41) делает
 `collect → snapshot → LLM(один вызов) → report`. LLM не имеет инструментов, не видит код, не может ничего проверить.
 
 ### Аудит реального кода (а не отчёта)
 
 | Компонент | Факт | Переиспользуем? |
 |---|---|---|
-| [`Abstractions/Models.cs`](src/LLMMetrics/ArtasTools.MonitorAgent.Abstractions/Models.cs:1) | `LogFact`, `ErrorSample`, `MetricFact`, `RunInfo`, `LlmRunInfo` | ✅ да, без изменений |
-| [`Abstractions/IAnalysisLlmClient.cs`](src/LLMMetrics/ArtasTools.MonitorAgent.Abstractions/IAnalysisLlmClient.cs:7) | один метод `CompleteAsync` | ⚠️ расширяем (см. §5.2) |
-| [`Abstractions/LlmRequest.cs`](src/LLMMetrics/ArtasTools.MonitorAgent.Abstractions/LlmRequest.cs:6) | `record LlmRequest` / `LlmCompletion` | ✅ да, аддитивно |
-| [`Abstractions/IFactStore.cs`](src/LLMMetrics/ArtasTools.MonitorAgent.Abstractions/IFactStore.cs:6) | 11 методов, SQLite | ⚠️ расширяем (агентские таблицы) |
-| [`Core/Collection/LokiFactCollector.cs`](src/LLMMetrics/ArtasTools.MonitorAgent.Core/Collection/LokiFactCollector.cs) | детерминированные LogQL-запросы | ✅ да → превращаем в tool |
-| [`Core/Collection/PrometheusFactCollector.cs`](src/LLMMetrics/ArtasTools.MonitorAgent.Core/Collection/PrometheusFactCollector.cs) | детерминированные PromQL-запросы | ✅ да → превращаем в tool |
-| [`Core/Snapshot/SnapshotBuilder.cs`](src/LLMMetrics/ArtasTools.MonitorAgent.Core/Snapshot/SnapshotBuilder.cs:28) | Markdown-сводка | ✅ да, ядро входного контекста |
-| [`Core/Snapshot/TokenBudgetGuard.cs`](src/LLMMetrics/ArtasTools.MonitorAgent.Core/Snapshot/TokenBudgetGuard.cs) | обрезка по бюджету | ✅ да, критично для агента |
-| [`Core/Snapshot/Redactor.cs`](src/LLMMetrics/ArtasTools.MonitorAgent.Core/Snapshot/Redactor.cs) | вырезание секретов | ✅ да, **обязателен** перед записью в файлы |
-| [`Core/Snapshot/ErrorSignatureNormalizer.cs`](src/LLMMetrics/ArtasTools.MonitorAgent.Core/Snapshot/ErrorSignatureNormalizer.cs) | маскирование GUID/путей | ✅ да |
-| [`Core/Analysis/ResponseParser.cs`](src/LLMMetrics/ArtasTools.MonitorAgent.Core/Analysis/ResponseParser.cs:36) | JSON → `AnalysisResult`, понижение вердикта | ✅ да, остаётся финальным валидатором |
-| [`Core/Analysis/LlmJsonSchema.cs`](src/LLMMetrics/ArtasTools.MonitorAgent.Core/Analysis/LlmJsonSchema.cs:6) | JSON-схема вердикта | ✅ да, расширяем полями агента |
-| [`Core/Reporting/*.cs`](src/LLMMetrics/ArtasTools.MonitorAgent.Core/Reporting) | Markdown + JSON рендер | ✅ да, расширяем |
-| [`Core/Storage/SqliteFactStore.cs`](src/LLMMetrics/ArtasTools.MonitorAgent.Core/Storage/SqliteFactStore.cs) | SQLite, WAL, retention | ⚠️ расширяем схему |
-| [`Infrastructure/Loki/LokiHttpClient.cs`](src/LLMMetrics/ArtasTools.MonitorAgent.Infrastructure/Loki/LokiHttpClient.cs) | HTTP-клиент Loki | ✅ да |
-| [`Infrastructure/Prometheus/PrometheusHttpClient.cs`](src/LLMMetrics/ArtasTools.MonitorAgent.Infrastructure/Prometheus/PrometheusHttpClient.cs) | HTTP-клиент Prometheus | ✅ да |
-| [`Llm/CustomOpenAiCompatibleClient.cs`](src/LLMMetrics/ArtasTools.MonitorAgent.Llm/CustomOpenAiCompatibleClient.cs) | свой HttpClient, json_schema, ретраи | ✅ да, **основа для tool calling** |
-| [`Llm/MeaiLlmClient.cs`](src/LLMMetrics/ArtasTools.MonitorAgent.Llm/MeaiLlmClient.cs) | **заглушка** `InvalidOperationException` | ⚠️ заменяем на реальную реализацию |
-| [`ArtasTools.MonitorAgent/Scheduling/NightlyScheduleHostedService.cs`](src/LLMMetrics/ArtasTools.MonitorAgent/Scheduling/NightlyScheduleHostedService.cs) | 03:00 UTC, catch-up, semaphore | ✅ да |
-| [`ArtasTools.MonitorAgent/Health/AgentHealthState.cs`](src/LLMMetrics/ArtasTools.MonitorAgent/Health/AgentHealthState.cs) | `/health`, `/status` | ✅ да, расширяем |
+| [`Abstractions/Models.cs`](src/LLMNetHelper/LLMNetHelper.Abstractions/Models.cs:1) | `LogFact`, `ErrorSample`, `MetricFact`, `RunInfo`, `LlmRunInfo` | ✅ да, без изменений |
+| [`Abstractions/IAnalysisLlmClient.cs`](src/LLMNetHelper/LLMNetHelper.Abstractions/IAnalysisLlmClient.cs:7) | один метод `CompleteAsync` | ⚠️ расширяем (см. §5.2) |
+| [`Abstractions/LlmRequest.cs`](src/LLMNetHelper/LLMNetHelper.Abstractions/LlmRequest.cs:6) | `record LlmRequest` / `LlmCompletion` | ✅ да, аддитивно |
+| [`Abstractions/IFactStore.cs`](src/LLMNetHelper/LLMNetHelper.Abstractions/IFactStore.cs:6) | 11 методов, SQLite | ⚠️ расширяем (агентские таблицы) |
+| [`Core/Collection/LokiFactCollector.cs`](src/LLMNetHelper/LLMNetHelper.Core/Collection/LokiFactCollector.cs) | детерминированные LogQL-запросы | ✅ да → превращаем в tool |
+| [`Core/Collection/PrometheusFactCollector.cs`](src/LLMNetHelper/LLMNetHelper.Core/Collection/PrometheusFactCollector.cs) | детерминированные PromQL-запросы | ✅ да → превращаем в tool |
+| [`Core/Snapshot/SnapshotBuilder.cs`](src/LLMNetHelper/LLMNetHelper.Core/Snapshot/SnapshotBuilder.cs:28) | Markdown-сводка | ✅ да, ядро входного контекста |
+| [`Core/Snapshot/TokenBudgetGuard.cs`](src/LLMNetHelper/LLMNetHelper.Core/Snapshot/TokenBudgetGuard.cs) | обрезка по бюджету | ✅ да, критично для агента |
+| [`Core/Snapshot/Redactor.cs`](src/LLMNetHelper/LLMNetHelper.Core/Snapshot/Redactor.cs) | вырезание секретов | ✅ да, **обязателен** перед записью в файлы |
+| [`Core/Snapshot/ErrorSignatureNormalizer.cs`](src/LLMNetHelper/LLMNetHelper.Core/Snapshot/ErrorSignatureNormalizer.cs) | маскирование GUID/путей | ✅ да |
+| [`Core/Analysis/ResponseParser.cs`](src/LLMNetHelper/LLMNetHelper.Core/Analysis/ResponseParser.cs:36) | JSON → `AnalysisResult`, понижение вердикта | ✅ да, остаётся финальным валидатором |
+| [`Core/Analysis/LlmJsonSchema.cs`](src/LLMNetHelper/LLMNetHelper.Core/Analysis/LlmJsonSchema.cs:6) | JSON-схема вердикта | ✅ да, расширяем полями агента |
+| [`Core/Reporting/*.cs`](src/LLMNetHelper/LLMNetHelper.Core/Reporting) | Markdown + JSON рендер | ✅ да, расширяем |
+| [`Core/Storage/SqliteFactStore.cs`](src/LLMNetHelper/LLMNetHelper.Core/Storage/SqliteFactStore.cs) | SQLite, WAL, retention | ⚠️ расширяем схему |
+| [`Infrastructure/Loki/LokiHttpClient.cs`](src/LLMNetHelper/LLMNetHelper.Infrastructure/Loki/LokiHttpClient.cs) | HTTP-клиент Loki | ✅ да |
+| [`Infrastructure/Prometheus/PrometheusHttpClient.cs`](src/LLMNetHelper/LLMNetHelper.Infrastructure/Prometheus/PrometheusHttpClient.cs) | HTTP-клиент Prometheus | ✅ да |
+| [`Llm/CustomOpenAiCompatibleClient.cs`](src/LLMNetHelper/LLMNetHelper.Llm/CustomOpenAiCompatibleClient.cs) | свой HttpClient, json_schema, ретраи | ✅ да, **основа для tool calling** |
+| [`Llm/MeaiLlmClient.cs`](src/LLMNetHelper/LLMNetHelper.Llm/MeaiLlmClient.cs) | **заглушка** `InvalidOperationException` | ⚠️ заменяем на реальную реализацию |
+| [`LLMNetHelper/Scheduling/NightlyScheduleHostedService.cs`](src/LLMNetHelper/LLMNetHelper/Scheduling/NightlyScheduleHostedService.cs) | 03:00 UTC, catch-up, semaphore | ✅ да |
+| [`LLMNetHelper/Health/AgentHealthState.cs`](src/LLMNetHelper/LLMNetHelper/Health/AgentHealthState.cs) | `/health`, `/status` | ✅ да, расширяем |
 | `Tests/Fixtures/` | **пустая папка** | ⚠️ наполняем |
 
 ### Технический долг, который план закрывает попутно
 
 1. **`MeaiLlmClient` — заглушка.** Переписать реально через `IChatClient` из `Microsoft.Extensions.AI`.
-2. **Дубли `Options`** — [`Abstractions/AgentOptions.cs`](src/LLMMetrics/ArtasTools.MonitorAgent.Abstractions/AgentOptions.cs) и [`ArtasTools.MonitorAgent/Options/AgentOptions.cs`](src/LLMMetrics/ArtasTools.MonitorAgent/Options/AgentOptions.cs). Свести к одному.
-3. **`NightlyRunner` — статический класс с собственным `LoggerFactory`** ([строки 38-39](src/LLMMetrics/ArtasTools.MonitorAgent/NightlyRunner.cs:38)), сервисы создаются `new` внутри метода. Перевести на DI.
+2. **Дубли `Options`** — [`Abstractions/AgentOptions.cs`](src/LLMNetHelper/LLMNetHelper.Abstractions/AgentOptions.cs) и [`LLMNetHelper/Options/AgentOptions.cs`](src/LLMNetHelper/LLMNetHelper/Options/AgentOptions.cs). Свести к одному.
+3. **`NightlyRunner` — статический класс с собственным `LoggerFactory`** ([строки 38-39](src/LLMNetHelper/LLMNetHelper/NightlyRunner.cs:38)), сервисы создаются `new` внутри метода. Перевести на DI.
 4. **Отчёт утверждает про тесты, которых нет** (`Fixtures/` пуста, HTTP-клиенты не покрыты).
 5. **Нет `global.json`** — версия SDK не зафиксирована.
 
@@ -218,8 +218,8 @@ flowchart TD
 ## 5. Целевая структура проектов
 
 ```
-src/LLMMetrics/
-├── ArtasTools.MonitorAgent.Abstractions/           # [расширяется] контракты
+src/LLMNetHelper/
+├── LLMNetHelper.Abstractions/           # [расширяется] контракты
 │   ├── Models.cs                                   # [есть]
 │   ├── LlmRequest.cs                               # [есть] + ToolDefinition, ToolCall, ChatTurn
 │   ├── IAnalysisLlmClient.cs                       # [есть] + IChatCompletionClient
@@ -233,30 +233,30 @@ src/LLMMetrics/
 │   ├── IRoslynWorkspace.cs                         # [НОВЫЙ] чтение/правка AST
 │   └── LlmOptions.cs / AgentOptions.cs / ...       # [есть]
 │
-├── ArtasTools.MonitorAgent.Core/                   # [расширяется]
+├── LLMNetHelper.Core/                   # [расширяется]
 │   ├── Collection/                                 # [есть, без изменений]
 │   ├── Snapshot/                                   # [есть, без изменений]
 │   ├── Storage/Migrations/002_agent.sql            # [НОВЫЙ]
 │   ├── Analysis/                                   # [есть] + расширение схемы
 │   └── Reporting/                                  # [есть] + PatchRenderer
 │
-├── ArtasTools.MonitorAgent.Llm/                    # [правится]
+├── LLMNetHelper.Llm/                    # [правится]
 │   ├── CustomOpenAiCompatibleClient.cs             # [есть] + tool calling
 │   ├── MeaiLlmClient.cs                            # [ПЕРЕПИСАТЬ] реальный IChatClient
 │   └── LlmClientRegistration.cs                    # [есть]
 │
-├── ArtasTools.MonitorAgent.Infrastructure/         # [расширяется]
+├── LLMNetHelper.Infrastructure/         # [расширяется]
 │   ├── Loki/ · Prometheus/ · Reporting/            # [есть]
 │   └── Context/LocalFolderContextSource.cs         # [НОВЫЙ] этап 1
 │
-├── ArtasTools.MonitorAgent.Context/                # [НОВЫЙ проект]
+├── LLMNetHelper.Context/                # [НОВЫЙ проект]
 │   ├── FileWalker.cs                               # обход каталога, фильтры, лимиты
 │   ├── TextChunker.cs                              # чанки по заголовкам/абзацам
 │   ├── KeywordRanker.cs                            # BM25-подобный ранжировщик
 │   ├── ContextQueryBuilder.cs                      # из инцидента → запрос
 │   └── ContextSourceRegistration.cs                # AddContextSources
 │
-├── ArtasTools.MonitorAgent.Roslyn/                 # [НОВЫЙ проект]
+├── LLMNetHelper.Roslyn/                 # [НОВЫЙ проект]
 │   ├── SolutionLoader.cs                           # MSBuildWorkspace, кэш Compilation
 │   ├── CodeSearchService.cs                        # поиск типов/методов/символов
 │   ├── CallGraphService.cs                         # кто вызывает / кого вызывает
@@ -265,13 +265,13 @@ src/LLMMetrics/
 │   ├── AstPatcher.cs                               # замена тела метода через AST
 │   └── CompilationValidator.cs                     # diagnostics после правки
 │
-├── ArtasTools.MonitorAgent.CodeChange/             # [НОВЫЙ проект]
+├── LLMNetHelper.CodeChange/             # [НОВЫЙ проект]
 │   ├── GitService.cs                               # ветка/status/diff/commit (libgit2sharp ИЛИ Process git)
 │   ├── BuildTestRunner.cs                          # dotnet build/test через Process
 │   ├── PatchApplier.cs                             # оркестрация: ветка → правки → проверка
 │   └── ChangeTransaction.cs                        # откат при провале
 │
-├── ArtasTools.MonitorAgent.Agent/                  # [НОВЫЙ проект]
+├── LLMNetHelper.Agent/                  # [НОВЫЙ проект]
 │   ├── Tools/LokiQueryTool.cs                      # [AgentToolFunction]
 │   ├── Tools/PrometheusQueryTool.cs
 │   ├── Tools/DocsSearchTool.cs
@@ -283,19 +283,19 @@ src/LLMMetrics/
 │   ├── Orchestration/OrchestratorRegistration.cs
 │   └── Prompts/AgentPromptBuilder.cs               # системный промпт + правила
 │
-├── ArtasTools.MonitorAgent/                        # [правится] Worker Service
+├── LLMNetHelper/                        # [правится] Worker Service
 │   ├── AgentRunner.cs                              # [НОВЫЙ] заменяет NightlyRunner (DI, не static)
 │   ├── NightlyRunner.cs                            # [УДАЛИТЬ] после переноса
 │   ├── DependencyInjection.cs                      # [есть] + регистрация новых слоёв
 │   ├── Program.cs                                  # [есть] + новые флаги
 │   └── Scheduling/ · Health/ · Options/            # [есть]
 │
-├── ArtasTools.MonitorAgent.Orchestration.SemanticKernel/   # [ФАЗА 4, вне решения]
+├── LLMNetHelper.Orchestration.SemanticKernel/   # [ФАЗА 4, вне решения]
 │   ├── SemanticKernelAgentOrchestrator.cs
 │   ├── SkPluginAdapter.cs                          # IAgentTool → KernelFunction
 │   └── *.csproj с условием EnableSemanticKernel
 │
-└── ArtasTools.MonitorAgent.Tests/                  # [расширяется]
+└── LLMNetHelper.Tests/                  # [расширяется]
     ├── Fixtures/                                   # [НАПОЛНИТЬ]
     ├── Context/ · Roslyn/ · Agent/ · CodeChange/   # [НОВЫЕ]
     └── ...                                         # [есть]
@@ -600,7 +600,7 @@ CREATE INDEX IF NOT EXISTS ix_context_reads_run ON context_reads(run_id);
 | [`02.md:288`](plans/02.md:288) | `IEmbeddingGeneration<string,float>` — устаревший API MEAI | отложено до фазы 5 (векторный поиск), сейчас — `KeywordRanker` |
 | [`02.md:162`](plans/02.md:162) | `ReverseMarkdown` — пакета в кэше нет | свой минимальный HTML→Markdown (или отказ от HTML на этапе 1) |
 | [`02.md:275`](plans/02.md:275) | `IndexConfluenceSpaceAsync` требует Qdrant — пакета нет | `IContextSource` + файловый источник; Qdrant заменяется на `pgvector` (фаза 5) |
-| [`02.md:485`](plans/02.md:485) | Токены в `appsettings.json` с `{{...}}`-плейсхолдерами | реальные секреты — только в `.env`, `appsettings.example.json` без значений ([текущая практика](src/LLMMetrics/monitor-agent.env.example:1)) |
+| [`02.md:485`](plans/02.md:485) | Токены в `appsettings.json` с `{{...}}`-плейсхолдерами | реальные секреты — только в `.env`, `appsettings.example.json` без значений ([текущая практика](src/LLMNetHelper/monitor-agent.env.example:1)) |
 
 ---
 
@@ -622,7 +622,7 @@ CREATE INDEX IF NOT EXISTS ix_context_reads_run ON context_reads(run_id);
 ### Фаза 1 — Абстракция источников контекста + файловый источник
 
 1. `IContextSource`, `ContextDocument`, `ContextQuery` в `Abstractions`.
-2. Новый проект `ArtasTools.MonitorAgent.Context`:
+2. Новый проект `LLMNetHelper.Context`:
    - `FileWalker` — обход с фильтрами `**/*.md`, `**/*.cs` (включаемые/исключаемые glob), лимит файлов/размера;
    - `TextChunker` — разбиение по заголовкам Markdown и пустым строкам, с перекрытием;
    - `KeywordRanker` — BM25-подобный скоринг по токенам запроса (без внешних зависимостей);
@@ -638,7 +638,7 @@ CREATE INDEX IF NOT EXISTS ix_context_reads_run ON context_reads(run_id);
 
 ### Фаза 2 — Roslyn: чтение
 
-1. Проект `ArtasTools.MonitorAgent.Roslyn` (`Microsoft.CodeAnalysis.CSharp.Workspaces` 4.14.0,
+1. Проект `LLMNetHelper.Roslyn` (`Microsoft.CodeAnalysis.CSharp.Workspaces` 4.14.0,
    `Microsoft.CodeAnalysis.Workspaces.MSBuild` 4.14.0).
 2. `SolutionLoader` с кэшем `Compilation` и корректным освобождением `MSBuildWorkspace`.
 3. `CodeSearchService`, `CallGraphService`, `FailurePointAnalyzer`, `SymbolLocator`.
@@ -652,7 +652,7 @@ CREATE INDEX IF NOT EXISTS ix_context_reads_run ON context_reads(run_id);
 ### Фаза 3 — Roslyn: правка + полный цикл git/build/test
 
 1. `AstPatcher` (`ReplaceMethodBody`, `AddNullCheck`) + `CompilationValidator`.
-2. Проект `ArtasTools.MonitorAgent.CodeChange`:
+2. Проект `LLMNetHelper.CodeChange`:
    - `GitService` — предпочтительно **через `Process`-вызов `git`** (пакет `LibGit2Sharp` надо проверить
      в кэше; если нет — только `git` CLI, что и надёжнее);
    - `BuildTestRunner` — `dotnet build` / `dotnet test` с таймаутом и отменой;
@@ -687,7 +687,7 @@ CREATE INDEX IF NOT EXISTS ix_context_reads_run ON context_reads(run_id);
 > ✅ **Предусловие выполнено.** SK 1.81.0 (5 прямых + 27 транзитивных пакетов) уже в глобальном кэше,
 > офлайн-restore и сборка под `net10.0` проверены — см. §2.2.
 
-1. Проект `ArtasTools.MonitorAgent.Orchestration.SemanticKernel` с `EnableSemanticKernel`-условием
+1. Проект `LLMNetHelper.Orchestration.SemanticKernel` с `EnableSemanticKernel`-условием
    и `PackageReference` на `Core` / `Connectors.[OI]` / `Agents.Core` версии **1.81.0**.
 2. `SkPluginAdapter` — `IAgentTool` → `KernelFunction` (`[KernelFunction]`/`KernelFunctionFactory`).
 3. `SemanticKernelAgentOrchestrator` — на `ChatCompletionAgent`/`InvokePromptAsync`.
@@ -732,7 +732,7 @@ CREATE INDEX IF NOT EXISTS ix_context_reads_run ON context_reads(run_id);
   },
   "Roslyn": {
     "Enabled": true,
-    "SolutionPath": "src/LLMMetrics/ArtasTools.MonitorAgent.slnx",
+    "SolutionPath": "src/LLMNetHelper/LLMNetHelper.slnx",
     "CompilationCacheSeconds": 300,
     "MaxSourceChars": 20000
   },
@@ -782,7 +782,7 @@ CREATE INDEX IF NOT EXISTS ix_context_reads_run ON context_reads(run_id);
 | Утечка секретов из файлов контекста в отчёт | средняя | `Redactor` применяется к **каждому** `ContextDocument` до отправки в LLM |
 | Утечка `.env`/ключей в контекст | средняя | `Exclude` по умолчанию содержит `.env*`, `*.key`, `secrets*` |
 | Долгая загрузка решения на каждом прогоне | средняя | кэш `Compilation` + флаг «перезагружать только после правок» |
-| Изменение `src/LLMMetrics` сломает работающий ночной отчёт | низкая | Фаза 0 фиксирует эталонный `--dry-run`-отчёт, тест сравнивает |
+| Изменение `src/LLMNetHelper` сломает работающий ночной отчёт | низкая | Фаза 0 фиксирует эталонный `--dry-run`-отчёт, тест сравнивает |
 
 ---
 

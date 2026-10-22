@@ -3,11 +3,11 @@
 ## Запуск (только через явный вызов pwsh)
 
 Расширение `.ps1` в этой системе ассоциировано с `notepad.exe` — запуск вида
-`.\run_LLMMetrics.ps1` НЕ исполняет скрипт, а открывает его в Блокноте.
+`.\run_LLMNetHelper.ps1` НЕ исполняет скрипт, а открывает его в Блокноте.
 Всегда:
 
 ```powershell
-pwsh -NoProfile -Command "[Console]::OutputEncoding=[Text.Encoding]::UTF8; $OutputEncoding=[Text.Encoding]::UTF8; chcp 65001 > $null; & 'src/LLMMetrics/run_LLMMetrics.ps1' -NoPause <режим>"
+pwsh -NoProfile -Command "[Console]::OutputEncoding=[Text.Encoding]::UTF8; $OutputEncoding=[Text.Encoding]::UTF8; chcp 65001 > $null; & 'src/LLMNetHelper/run_LLMNetHelper.ps1' -NoPause <режим>"
 ```
 
 UTF-8-префикс обязателен: консоль стартует в CP866, кириллица без него ломается.
@@ -26,7 +26,7 @@ UTF-8-префикс обязателен: консоль стартует в CP
 | `-Daemon -Foreground` | То же в текущем терминале |
 | `-Stop` | Остановить демон, запущенный этим скриптом (только свой PID из файла) |
 | `-Check` | Проверить доступность Loki и Prometheus |
-| `-Test` | `dotnet test` по решению `src/LLMMetrics/LLMNetHelper.slnx` |
+| `-Test` | `dotnet test` по решению `src/LLMNetHelper/LLMNetHelper.slnx` |
 | `-Info` | Показать разрешённую конфигурацию (пути, порты, существование каталогов) |
 | `-NoBuild` | Не пересобирать перед запуском |
 | `-Roslyn` / `-CodeChange` | Включить соответствующие подсистемы только для этого запуска (переопределяют `.env`) |
@@ -53,7 +53,7 @@ UTF-8-префикс обязателен: консоль стартует в CP
 ## Типовая диагностика
 
 ### Агент не стартует в фоне
-1. `run_LLMMetrics.ps1 -Info` — проверить, что health-порт не занят
+1. `run_LLMNetHelper.ps1 -Info` — проверить, что health-порт не занят
    (`Test-AgentPort` печатается в выводе).
 2. HttpListener на `http://localhost:<port>/` без админ-прав требует
    `netsh http add urlacl url=http://localhost:8091/ user=%USERNAME%` —
@@ -61,7 +61,7 @@ UTF-8-префикс обязателен: консоль стартует в CP
 3. Смотреть `reports\monitoring\logs\monitor-agent.stderr.log`.
 
 ### Прогон упал с кодом 1
-1. `run_LLMMetrics.ps1 -Check` — Loki/Prometheus доступны?
+1. `run_LLMNetHelper.ps1 -Check` — Loki/Prometheus доступны?
    Loki сразу после старта контейнера отдаёт 503 («prologue: not ready») —
    это прогрев, `-Check` повторяет до 5 раз.
 2. Без источников прогон соберёт пустую сводку — это не падение, но диагноз
@@ -76,7 +76,7 @@ UTF-8-префикс обязателен: консоль стартует в CP
 ### Отчёты ушли не в тот каталог
 Признак запуска НЕ через раннер (например, прямой `dotnet run` из
 произвольного каталога): относительные пути разрешились от рабочего каталога
-процесса. Запускать через `run_LLMMetrics.ps1` или задать абсолютные пути в `.env`.
+процесса. Запускать через `run_LLMNetHelper.ps1` или задать абсолютные пути в `.env`.
 
 ### Проверка конфигурации перед включением правок
 1. `CODECHANGE__ENABLED=false` — дефолт, не менять «на всякий случай».
@@ -90,7 +90,7 @@ UTF-8-префикс обязателен: консоль стартует в CP
 Только через `dotnet test` для решения проекта:
 
 ```powershell
-dotnet test src/LLMMetrics/LLMNetHelper.slnx
+dotnet test src/LLMNetHelper/LLMNetHelper.slnx
 ```
 
 Все тесты офлайн: сеть и Docker не требуются. Фейковые `IChatClient`
