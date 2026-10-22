@@ -1,0 +1,14 @@
+<Solution>
+  <Project Path="ArtasTools.MonitorAgent.Abstractions/ArtasTools.MonitorAgent.Abstractions.csproj" />
+  <Project Path="ArtasTools.MonitorAgent.Agent/ArtasTools.MonitorAgent.Agent.csproj" />
+  <Project Path="ArtasTools.MonitorAgent.CodeChange/ArtasTools.MonitorAgent.CodeChange.csproj" />
+  <Project Path="ArtasTools.MonitorAgent.Context/ArtasTools.MonitorAgent.Context.csproj" />
+  <Project Path="ArtasTools.MonitorAgent.Core/ArtasTools.MonitorAgent.Core.csproj" />
+  <Project Path="ArtasTools.MonitorAgent.Infrastructure/ArtasTools.MonitorAgent.Infrastructure.csproj" />
+  <Project Path="ArtasTools.MonitorAgent.Llm/ArtasTools.MonitorAgent.Llm.csproj" />
+  <Project Path="ArtasTools.MonitorAgent.Orchestration.SemanticKernel.Tests/ArtasTools.MonitorAgent.Orchestration.SemanticKernel.Tests.csproj" />
+  <Project Path="ArtasTools.MonitorAgent.Orchestration.SemanticKernel/ArtasTools.MonitorAgent.Orchestration.SemanticKernel.csproj" />
+  <Project Path="ArtasTools.MonitorAgent.Roslyn/ArtasTools.MonitorAgent.Roslyn.csproj" />
+  <Project Path="ArtasTools.MonitorAgent.Tests/ArtasTools.MonitorAgent.Tests.csproj" />
+  <Project Path="ArtasTools.MonitorAgent/ArtasTools.MonitorAgent.csproj" />
+</Solution>

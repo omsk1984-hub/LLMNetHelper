@@ -1,26 +1,60 @@
+# ArtasTools.MonitorAgent — Docker-развёртывание
+#
+# Билд-контекст: src/LLMMetrics (корень с решением LLMNetHelper.slnx).
+# Файл конфигурации: ./monitor-agent.env (шаблон — monitor-agent.env.example).
+#
+# Запуск:
+#   Copy-Item deploy/monitor-agent/monitor-agent.env.example `
+#             deploy/monitor-agent/monitor-agent.env
+#   pwsh -File deploy/monitor-agent/run_MonitorAgent.ps1 start
+#
+# Сеть мониторинга по умолчанию — monitoring_artas_monitoring (external,
+# создаётся docker-составом Loki/Prometheus). Переопределяется переменной
+# MONITORING_NETWORK в deploy/monitor-agent/.env (механизм env-подстановки
+# compose), что позволяет подключить контейнер к другой сети без правки файла.
+
 services:
   monitor-agent:
     build:
       context: ../../src/LLMMetrics
-      dockerfile: ../deploy/monitor-agent/Dockerfile
+      dockerfile: ../../deploy/monitor-agent/Dockerfile
     image: artas-monitor-agent:local
     container_name: artas_monitor_agent
     restart: unless-stopped
     env_file: ./monitor-agent.env
     environment:
+      # Внутри контейнера источники — по ИМЕНАМ сервисов общей сети,
+      # а не localhost (в отличие от хостового запуска).
       Loki__BaseUrl: http://loki:3100
+      Loki__TimeoutSeconds: "30"
+      Loki__MaxEntries: "500"
       Prometheus__BaseUrl: http://prometheus:9090
+      Prometheus__TimeoutSeconds: "30"
+
       Agent__ReportsDir: /reports/monitoring
       Agent__DatabasePath: /reports/monitoring/facts.db
       Agent__RunAtUtc: "03:00"
       Agent__WindowHours: "24"
+
+      # Каталог документации монтируется в /docs (см. volumes).
+      Context__Enabled: "true"
+      Context__Sources__local-folder__Path: /docs
+      CONTEXT__SOURCES__LOCAL_FOLDER__INCLUDE__0: "**/*.md"
+
+      # Roslyn и CodeChange в контейнере ВЫКЛЮЧЕНЫ намеренно: runtime-образ
+      # не содержит полного MSBuild SDK, загрузка решения невозможна.
+      ROSLYN__ENABLED: "false"
+      CODECHANGE__ENABLED: "false"
+
       TZ: UTC
     volumes:
       - ../../reports/monitoring:/reports/monitoring
+      # docs/ лежит в корне репозитория, вне билд-контекста образа -> mount.
+      - ../../docs:/docs:ro
     ports:
       - "127.0.0.1:8091:80"     # health, только localhost
     networks:
-      - monitoring_artas_monitoring
+      - monitoring
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:80/health >/dev/null || exit 1"]
       interval: 60s
@@ -32,6 +66,6 @@ services:
       options: { max-size: "10m", max-file: "3" }
 
 networks:
-  monitoring_artas_monitoring:
+  monitoring:
     external: true
-    name: monitoring_artas_monitoring
+    name: ${MONITORING_NETWORK:-monitoring_artas_monitoring}

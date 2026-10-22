@@ -1,16 +1,16 @@
-# Правило: запуск PowerShell-скриптов (.ps1) в проекте Artas2026
+# Правило: запуск PowerShell-скриптов (.ps1) в проекте LLMNetHelper
 
 ## Контекст проблемы
 
-Терминал, в который Roo отправляет команды (`execute_command`), стартует в
-**`cmd.exe`**, а не в PowerShell. При этом в системе ассоциация расширения `.ps1`
+Терминал, в который агенты отправляют команды (`execute_command`), стартует в
+**cmd.exe**, а не в PowerShell. При этом в системе ассоциация расширения `.ps1`
 переназначена на `notepad.exe`:
 
 ```
 ftype Microsoft.PowerShellScript.1 = "C:\Windows\System32\notepad.exe" "%1"
 ```
 
-Из-за этого команда вида `.\run_Reader.ps1` **не исполняется**, а передаётся
+Из-за этого команда вида `.\run_LLMMetrics.ps1` **не исполняется**, а передаётся
 диспетчеру ассоциаций Windows, который открывает файл в **Блокноте**.
 Дополнительно PowerShell стартует с `[Console]::OutputEncoding = CP866`, тогда
 как читатель вывода ожидает UTF-8 — кириллица превращается в «кракозябры».
@@ -42,8 +42,8 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File "<путь_к_скрипту>" <п
   `RemoteSigned`, но Bypass делает запуск независимым от политики).
 - `-File` / оператор `&` — принципиально важно: заставляет PowerShell **исполнять**
   файл, минуя ассоциацию `.ps1` → notepad.
-- Путь указывать относительно корня репозитория `d:/work/Artas2026`
-  (например `src/Reader/run_Reader.ps1`), т.к. `cwd` фиксирован рабочей папкой.
+- Путь указывать относительно корня репозитория `d:/work/LLMNetHelper`
+  (например `src/LLMMetrics/run_LLMMetrics.ps1`), т.к. `cwd` фиксирован рабочей папкой.
 - Параметры скрипта передавать после пути к скрипту.
 - Для автоматических (неинтерактивных) запусков всегда добавлять `-NoPause`,
   иначе скрипт будет ждать нажатия клавиши и терминал «зависнет».
@@ -66,36 +66,30 @@ Windows PowerShell 5.1 `$OutputEncoding` вообще `US-ASCII (20127)`. Без
 
 Правило действует для **всех** `.ps1` в репозитории, в том числе:
 
-- `src/Reader/run_Reader.ps1`
-- `src/Writer/run_Writer.ps1`
-- `src/Stat/run_Stat.ps1`
-- `src/Tools/run_MemDiagnostics.ps1`
-- `src/Tools/MemReport/run_MemReport.ps1`
-- `src/Tools/ReportAnalyzer/run_ReportAnalyzer.ps1`
-- `db/apply-migrations.ps1`, `db/update.ps1`
-- `scripts/*.ps1`
+- `src/LLMMetrics/run_LLMMetrics.ps1`
+- `deploy/monitor-agent/run_MonitorAgent.ps1`
 
 ## Примеры
 
-Запуск проверки БД Reader без GUI:
+Одиночный прогон агента (DryRun) без пересборки:
 
 ```
-pwsh -NoProfile -Command "[Console]::OutputEncoding=[Text.Encoding]::UTF8; $OutputEncoding=[Text.Encoding]::UTF8; chcp 65001 > $null; & 'src/Reader/run_Reader.ps1' -NoBuild -NoPause -CheckDb Si"
+pwsh -NoProfile -Command "[Console]::OutputEncoding=[Text.Encoding]::UTF8; $OutputEncoding=[Text.Encoding]::UTF8; chcp 65001 > $null; & 'src/LLMMetrics/run_LLMMetrics.ps1' -NoPause -NoBuild"
 ```
 
-Запуск тестов Stat-скрипта в фоне без пересборки:
+Показать разрешённую конфигурацию:
 
 ```
-pwsh -NoProfile -Command "[Console]::OutputEncoding=[Text.Encoding]::UTF8; $OutputEncoding=[Text.Encoding]::UTF8; chcp 65001 > $null; & 'src/Stat/run_Stat.ps1' -NoBuild -NoPause -Symbol USDRUBF"
+pwsh -NoProfile -Command "[Console]::OutputEncoding=[Text.Encoding]::UTF8; $OutputEncoding=[Text.Encoding]::UTF8; chcp 65001 > $null; & 'src/LLMMetrics/run_LLMMetrics.ps1' -NoPause -Info"
 ```
 
 ## ВАЖНО: кириллица при ВЛОЖЕННЫХ .ps1 (`& script.ps1`)
 
-Проверено экспериментально (см. подробный разбор в
-[`docs/powershell-nested-cyrillic-encoding.md`](../docs/powershell-nested-cyrillic-encoding.md)).
+Проверено экспериментально (исторический разбор — в репозитории Artas2026,
+откуда произошёл проект).
 
-Вложенный `.ps1`, вызванный через оператор `&` (как `run_*.ps1` вызывают друг
-друга), исполняется в **том же .NET-хосте PowerShell** и пишет в **общий
+Вложенный `.ps1`, вызванный через оператор `&` (как `run_*.ps1` могут вызывать
+другие скрипты), исполняется в **том же .NET-хосте PowerShell** и пишет в **общий
 консольный handle** родителя. Кодировка вывода фиксируется при старте хоста,
 поэтому:
 
@@ -120,21 +114,17 @@ UTF-8-префикс в `pwsh -Command` лечит только вывод **с�
 Причина: дочерний процесс (`dotnet run`, `dotnet <dll>`) стартует со своей
 `Console.OutputEncoding`, равной **коду консоли (CP866)**, и пишет байты в CP866.
 Родительский pwsh (уже в UTF-8) читает эти байты как UTF-8 → кириллица искажается
-(«кракозябры»). Проверено: искажение остаётся даже при `| Out-File -Encoding utf8`,
-т.е. данные теряются на стороне дочернего процесса.
+(«кракозябры»).
 
-Места, где выводит C#-код (потенциально искажённая кириллица):
-
-- `src/Reader/ArtasChart.Services/DiagnosticsService.cs` — `Console.WriteLine` для `-CheckDb`.
-- `src/Reader/ArtasChart.App/Program.cs` — `Console.WriteLine("[start] ...")`.
-- аналогично в `Stat.Worker`, `ArtasWriter.Worker`, `Tools/*`.
+Место, где выводит C#-код: `src/LLMMetrics/ArtasTools.MonitorAgent/Program.cs`
+(`Console.WriteLine` / `Console.Error.WriteLine` для `[INFO]`, `[WARN]`,
+`[HEALTH]`).
 
 Лечится **только внутри C#** — установить UTF-8 на старте приложения, до первого
-`Console.WriteLine`:
+`Console.WriteLine` (в `Program.cs` это уже сделано):
 
 ```csharp
 Console.OutputEncoding = System.Text.Encoding.UTF8;
-Console.InputEncoding  = System.Text.Encoding.UTF8;
 ```
 
 Установка переменной окружения у родителя (`chcp`, `$OutputEncoding`) на
@@ -143,11 +133,11 @@ Console.InputEncoding  = System.Text.Encoding.UTF8;
 
 ## Запрещено
 
-- `.\run_Reader.ps1` (уйдёт в Блокнот).
-- `run_Reader.ps1` (то же самое).
+- `.\run_LLMMetrics.ps1` (уйдёт в Блокнот).
+- `run_LLMMetrics.ps1` (то же самое).
 - `powershell -File ...` без установки `[Console]::OutputEncoding` — сломает
   кириллицу (особенно Windows PowerShell 5.1 с `$OutputEncoding = US-ASCII`).
 - Запуск без `-NoPause` в неинтерактивном контексте — терминал заблокируется на
   `pause`.
-- Ожидать корректную кириллицу от дочернего `dotnet`/`dotnet run` без
+- Ожидать корректной кириллицы от дочернего `dotnet`/`dotnet run` без
   `Console.OutputEncoding = UTF8` в C#-коде приложения.

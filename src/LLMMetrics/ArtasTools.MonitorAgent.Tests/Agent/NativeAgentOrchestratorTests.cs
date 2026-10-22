@@ -354,3 +354,41 @@ public class ToolRegistryTests
         Assert.Contains("beta", text);
     }
 }
+
+/// <summary>
+/// Тесты системного промпта: доменный контекст — из конфигурации, а не из кода.
+/// </summary>
+public class AgentPromptBuilderTests
+{
+    [Fact]
+    public void SystemPrompt_NoDomainContext_UsesNeutralText()
+    {
+        var prompt = AgentPromptBuilder.BuildSystemPrompt("- tool: desc");
+
+        Assert.Contains(AgentPromptBuilder.NeutralDomainContext, prompt);
+        // Ни одного упоминания домена конкретного развёртывания.
+        Assert.DoesNotContain("Artas2026", prompt);
+        Assert.DoesNotContain("Finam", prompt);
+        Assert.DoesNotContain("фрактал", prompt, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void SystemPrompt_WithDomainContext_InsertsItVerbatim()
+    {
+        const string domain = "Система — торговый терминал: поток котировок → PostgreSQL, логи в Loki.";
+
+        var prompt = AgentPromptBuilder.BuildSystemPrompt("- tool: desc", domain);
+
+        Assert.Contains("## Анализируемая система", prompt);
+        Assert.Contains(domain, prompt);
+        Assert.DoesNotContain(AgentPromptBuilder.NeutralDomainContext, prompt);
+    }
+
+    [Fact]
+    public void SystemPrompt_WhitespaceDomainContext_TreatedAsUnset()
+    {
+        var prompt = AgentPromptBuilder.BuildSystemPrompt("- tool: desc", "   \n  ");
+
+        Assert.Contains(AgentPromptBuilder.NeutralDomainContext, prompt);
+    }
+}

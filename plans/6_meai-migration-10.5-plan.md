@@ -1,3 +1,5 @@
+> **АРХИВНО.** Исторический документ происхождения проекта: пути, решения (src/Tools/ArtasTools.slnx) и каталоги в нём относятся к прежнему репозиторию Artas2026 и НЕ являются актуальной конфигурацией. Актуальное состояние: README.md и docs/.
+
 # Миграция Microsoft.Extensions.AI: 9.0.0-preview.9 → 10.5.0
 
 > Предворяющий шаг перед фазами 5–6 плана [`5_agent-sk-roslyn-rebuild-plan.md`](plans/5_agent-sk-roslyn-rebuild-plan.md:1).

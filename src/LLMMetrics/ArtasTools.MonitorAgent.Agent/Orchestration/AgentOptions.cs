@@ -24,4 +24,16 @@ public sealed class AgentOrchestrationOptions
     /// При false агент только диагностирует.
     /// </summary>
     public bool EnableFixPlanning { get; set; } = true;
+
+    /// <summary>
+    /// Предметное описание анализируемой системы для системного промпта.
+    /// <para>
+    /// Доменная картина мира (что за система, какие у неё подсистемы и хранилища)
+    /// является частью развёртывания, а не кода: при пустом значении агент
+    /// получает нейтральное описание и строит гипотезы только на фактах из
+    /// сводки и документации. Заполняется в конфигурации
+    /// (<c>Agent:Orchestration:DomainContext</c> / <c>AGENT__ORCHESTRATION__DOMAINCONTEXT</c>).
+    /// </para>
+    /// </summary>
+    public string DomainContext { get; set; } = "";
 }

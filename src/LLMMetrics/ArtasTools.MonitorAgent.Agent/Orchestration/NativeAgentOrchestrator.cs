@@ -58,7 +58,7 @@ public sealed class NativeAgentOrchestrator : IAgentOrchestrator
 
         var messages = new List<ChatMessage>
         {
-            new(ChatRole.System, AgentPromptBuilder.BuildSystemPrompt(toolDescriptions)),
+            new(ChatRole.System, AgentPromptBuilder.BuildSystemPrompt(toolDescriptions, _options.DomainContext)),
             new(ChatRole.User, AgentPromptBuilder.BuildUserPrompt(context))
         };
 
@@ -139,7 +139,7 @@ public sealed class NativeAgentOrchestrator : IAgentOrchestrator
 
         var messages = new List<ChatMessage>
         {
-            new(ChatRole.System, AgentPromptBuilder.BuildSystemPrompt("(планирование правки)")),
+            new(ChatRole.System, AgentPromptBuilder.BuildSystemPrompt("(планирование правки)", _options.DomainContext)),
             new(ChatRole.User, AgentPromptBuilder.BuildUserPrompt(context)),
             new(ChatRole.User, AgentPromptBuilder.BuildPlanPrompt(diagnosis, context))
         };

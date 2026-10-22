@@ -67,10 +67,12 @@ param(
 $ErrorActionPreference = "Stop"
 
 $ScriptDir   = $PSScriptRoot
-# Корень репозитория (src/LLMMetrics -> ../..). База для .env и fallback-каталогов.
+# Корень репозитория (src/LLMMetrics -> ../..). База для .env и нормализации
+# относительных каталогов (ReportsDir, Context-путь и т.д.).
 $ProjectRoot = Resolve-Path (Join-Path $ScriptDir "..\..")
 $Project     = Join-Path $ScriptDir "ArtasTools.MonitorAgent\ArtasTools.MonitorAgent.csproj"
-$Solution    = Join-Path $ProjectRoot "src\Tools\ArtasTools.slnx"
+# Собственное решение проекта (автономно: не зависит от других репозиториев).
+$Solution    = Join-Path $ScriptDir "LLMNetHelper.slnx"
 $TestsProj   = Join-Path $ScriptDir "ArtasTools.MonitorAgent.Tests\ArtasTools.MonitorAgent.Tests.csproj"
 $SkTestsProj = Join-Path $ScriptDir "ArtasTools.MonitorAgent.Orchestration.SemanticKernel.Tests\ArtasTools.MonitorAgent.Orchestration.SemanticKernel.Tests.csproj"
 
@@ -102,10 +104,10 @@ try {
 } catch { }
 
 # --- Файл .env -------------------------------------------------
-# Парсер идентичен run_Writer.ps1 / run_Stat.ps1: KEY=VALUE, первый '=',
-# кавычки обрезаются, УЖЕ заданные переменные НЕ перезаписываются.
-# Отличие: здесь грузятся ОБА файла — локальный .env агента (приоритет)
-# и корневой .env (LOGS_DIR и общие настройки), не перекрывая друг друга.
+# Парсер: KEY=VALUE, первый '=', кавычки обрезаются,
+# УЖЕ заданные переменные НЕ перезаписываются.
+# Грузятся ОБА файла — локальный .env агента (приоритет) и корневой .env
+# (если существует), не перекрывая друг друга.
 function Import-EnvFile([string]$Path) {
     if (-not (Test-Path $Path)) { return }
     Write-Host "[run] Loading env file: $Path" -ForegroundColor DarkGray
@@ -145,8 +147,28 @@ function Get-EnvOr([string]$Name, [string]$Default) {
     return $v
 }
 
-$ReportsDir   = Get-EnvOr "AGENT__REPORTSDIR" (Join-Path $ProjectRoot "reports\monitoring")
-$DatabasePath = Get-EnvOr "AGENT__DATABASEPATH" (Join-Path $ReportsDir "facts.db")
+# Нормализация каталожных путей: относительные разрешаются от корня
+# репозитория, а не от произвольного рабочего каталога процесса. Результат
+# всегда абсолютный — это делает .env переносимым и независимым от способа
+# запуска (см. plans/7_standalone-migration-plan.md, R2).
+function Resolve-ProjectPath([string]$Path) {
+    if ([string]::IsNullOrWhiteSpace($Path)) { return $Path }
+    if ([System.IO.Path]::IsPathRooted($Path)) { return $Path }
+    return [System.IO.Path]::GetFullPath([System.IO.Path]::Combine($ProjectRoot, $Path))
+}
+
+# Экспортируем нормализованные значения обратно в окружение, чтобы процесс
+# приложения (dotnet run) получил их уже абсолютными. Уже заданные процессом
+# значения ПЕРЕЗАПИСЫВАЮТСЯ нормализованным: источник — тот же .env/окружение,
+# меняется только форма (относительный -> абсолютный).
+function Set-EnvNorm([string]$Name, [string]$Value) {
+    $norm = Resolve-ProjectPath $Value
+    [System.Environment]::SetEnvironmentVariable($Name, $norm, "Process")
+    return $norm
+}
+
+$ReportsDir   = Set-EnvNorm "AGENT__REPORTSDIR" (Get-EnvOr "AGENT__REPORTSDIR" (Join-Path $ProjectRoot "reports\monitoring"))
+$DatabasePath = Set-EnvNorm "AGENT__DATABASEPATH" (Get-EnvOr "AGENT__DATABASEPATH" (Join-Path $ReportsDir "facts.db"))
 $HealthPort   = Get-EnvOr "AGENT__HEALTHPORT" "8091"
 $LokiUrl      = Get-EnvOr "Loki__BaseUrl" "http://localhost:3100"
 $PromUrl      = Get-EnvOr "Prometheus__BaseUrl" "http://localhost:9090"
@@ -158,9 +180,21 @@ $RoslynOn     = Get-EnvOr "ROSLYN__ENABLED" "false"
 $ChangeOn     = Get-EnvOr "CODECHANGE__ENABLED" "false"
 $Orchestrator = Get-EnvOr "AGENT__ORCHESTRATION__ORCHESTRATOR" "native"
 
-# Каталог логов агента. НАМЕРЕННО не общий LOGS_DIR: Promtail собирает
-# <LOGS_DIR>\*.log и индексирует в Loki только writer.* / stat.*, а вывод
-# агента в Loki не нужен (он сам их читает и создал бы обратную связь).
+# Нормализуем остальные каталожные опции (относительные -> от корня проекта).
+foreach ($normVar in @(
+    "Context__Sources__local-folder__Path",
+    "ROSLYN__SOLUTIONPATH",
+    "CODECHANGE__REPOSITORYPATH",
+    "CODECHANGE__SOLUTIONPATH"
+)) {
+    $cur = [System.Environment]::GetEnvironmentVariable($normVar, "Process")
+    if ($cur) {
+        [System.Environment]::SetEnvironmentVariable($normVar, (Resolve-ProjectPath $cur), "Process")
+    }
+}
+
+# Каталог логов агента — <ReportsDir>\logs. Отдельного общего LOGS_DIR
+# (Writer/Stat/Promtail) в этом репозитории нет — проект автономен.
 $AgentLogDir = Join-Path $ReportsDir "logs"
 $PidFile     = Join-Path $AgentLogDir "monitor-agent.pid"
 
@@ -226,10 +260,9 @@ if ($Info) {
     Write-Host "Решение           : $Solution  (существует: $(Test-Path $Solution))"
     Write-Host ""
     Write-Host "--- Отчёты и хранение ---" -ForegroundColor Cyan
-    Write-Host "ReportsDir        : $ReportsDir"
+    Write-Host "ReportsDir        : $ReportsDir  (существует: $(Test-Path $ReportsDir))"
     Write-Host "DatabasePath      : $DatabasePath"
     Write-Host "Каталог логов     : $AgentLogDir"
-    Write-Host "LOGS_DIR (общий)  : $(Get-EnvOr 'LOGS_DIR' '<не задан>')"
     Write-Host ""
     Write-Host "--- Источники фактов ---" -ForegroundColor Cyan
     Write-Host "Loki              : $LokiUrl"
@@ -248,7 +281,8 @@ if ($Info) {
     Write-Host "HealthPort        : $HealthPort  (занят: $(Test-AgentPort ([int]$HealthPort)))"
     Write-Host "Roslyn enabled    : $RoslynOn"
     Write-Host "CodeChange enabled: $ChangeOn"
-    Write-Host "Context path      : $(Get-EnvOr 'Context__Sources__local-folder__Path' 'docs')"
+    Write-Host "Context path      : $(Get-EnvOr 'Context__Sources__local-folder__Path' 'docs')  (существует: $(Test-Path (Get-EnvOr 'Context__Sources__local-folder__Path' (Join-Path $ProjectRoot 'docs'))))"
+    Write-Host "DomainContext     : $(if (Get-EnvOr 'AGENT__ORCHESTRATION__DOMAINCONTEXT' '') { 'задан' } else { '<пусто — нейтральный промпт>' })"
     Write-Host ""
     Write-Host "--- Файлы ---" -ForegroundColor Cyan
     Write-Host "appsettings.json  : $(if (Test-Path (Join-Path $ScriptDir 'ArtasTools.MonitorAgent\appsettings.json')) { 'есть (переопределит .env-молча)' } else { 'нет — конфигурация только из .env/окружения' })"
@@ -345,7 +379,7 @@ if ($Check) {
 # ===============================================================
 if ($Test) {
     # Правила проекта (.roo/rules-code/01-test.md): тесты только через `dotnet test`
-    # для соответствующего решения. Проекты LLMMetrics входят в src/Tools/ArtasTools.slnx.
+    # для соответствующего решения. Все проекты входят в src/LLMMetrics/LLMNetHelper.slnx.
     if ($NoSemanticKernel) {
         Write-Host "[run] dotnet test: только основные тесты агента (SK отключён)" -ForegroundColor Cyan
         $targets = @($TestsProj)

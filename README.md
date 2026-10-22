@@ -1,8 +1,14 @@
-# Nightly LLM Agent — мониторинг с анализом кода
+# LLMNetHelper — Nightly LLM Agent: мониторинг с анализом кода
 
 Ночной агент проверки Loki и Prometheus, который диагностирует инциденты
 с привлечением документации проекта и анализа C#-кода, а при необходимости —
 предлагает и применяет правку в отдельной ветке.
+
+Репозиторий **автономен**: собственное решение, своя конфигурация, никаких
+зависимостей от других репозиториев. Относительные пути в `.env` разрешаются
+от корня репозитория. Подробная документация — в [`docs/`](docs/README.md):
+[архитектура](docs/architecture.md), [конфигурация](docs/configuration.md),
+[runbook](docs/runbook.md), [развёртывание](docs/deployment.md).
 
 ## Архитектура
 
@@ -26,7 +32,7 @@ ArtasTools.MonitorAgent.Orchestration.SemanticKernel        — SK 1.81.0 орк
 ArtasTools.MonitorAgent.Orchestration.SemanticKernel.Tests  — паритетные тесты
 ```
 
-Все 13 проектов входят в решение [`src/Tools/ArtasTools.slnx`](../../src/Tools/ArtasTools.slnx:1).
+Все проекты входят в решение [`src/LLMMetrics/LLMNetHelper.slnx`](src/LLMMetrics/LLMNetHelper.slnx:1).
 При `EnableSemanticKernel=false` SK-проекты компилируются пустыми (`Compile Remove`),
 поэтому `dotnet build` решения остаётся зелёным.
 
@@ -51,6 +57,22 @@ ChangeTransaction: ветка → AST-правка → build → test → commit
    Markdown + JSON + patch.diff
 ```
 
+## Запуск
+
+Кратко; полностью — [`docs/runbook.md`](docs/runbook.md).
+
+```powershell
+# .env из шаблона
+Copy-Item src/LLMMetrics/.env.example src/LLMMetrics/.env
+
+# Сборка и тесты
+dotnet build src/LLMMetrics/LLMNetHelper.slnx -c Release
+dotnet test  src/LLMMetrics/LLMNetHelper.slnx
+
+# Запуск раннера (.ps1 ассоциирован с notepad — вызывать pwsh явно):
+pwsh -NoProfile -Command "[Console]::OutputEncoding=[Text.Encoding]::UTF8; $OutputEncoding=[Text.Encoding]::UTF8; chcp 65001 > $null; & 'src/LLMMetrics/run_LLMMetrics.ps1' -NoPause"
+```
+
 ## Ключевые принципы
 
 1. **Детерминированный сбор фактов.** Запросы к Loki и Prometheus зафиксированы
@@ -66,25 +88,18 @@ ChangeTransaction: ветка → AST-правка → build → test → commit
    Мерж — вручную после проверки.
 6. **Безопасные дефолты.** `CodeChange:Enabled=false` и `Roslyn:Enabled=false`.
 7. **Всё по UTC.** Границы дня, окна анализа и метки времени — только UTC.
-
-## Запуск
-
-```bash
-# Только анализ и отчёт (без правок)
-dotnet run --project ArtasTools.MonitorAgent -- --run-now
-
-# Сбор фактов без вызова LLM
-dotnet run --project ArtasTools.MonitorAgent -- --dry-run
-
-# Своё окно анализа
-dotnet run --project ArtasTools.MonitorAgent -- --run-now --hours 12
-```
-
-Docker и управление — в [`deploy/monitor-agent/`](../../deploy/monitor-agent).
+8. **Доменный контекст — в конфигурации.** Предметное описание анализируемой
+   системы задаётся опцией `Agent:Orchestration:DomainContext`
+   (`AGENT__ORCHESTRATION__DOMAINCONTEXT`), а не зашито в промпт: при пустом
+   значении агент строит гипотезы только на фактах сводки и документации.
 
 ## Конфигурация
 
-Полный пример — [`ArtasTools.MonitorAgent/appsettings.example.json`](ArtasTools.MonitorAgent/appsettings.example.json:1).
+Основной источник — переменные окружения из `src/LLMMetrics/.env`
+(шаблон [`src/LLMMetrics/.env.example`](src/LLMMetrics/.env.example:1));
+`appsettings.json` факультативен
+(пример — [`ArtasTools.MonitorAgent/appsettings.example.json`](ArtasTools.MonitorAgent/appsettings.example.json:1)).
+Полная справка — [`docs/configuration.md`](docs/configuration.md).
 
 ### Основное
 
@@ -103,6 +118,7 @@ Docker и управление — в [`deploy/monitor-agent/`](../../deploy/mon
 | `Agent:Orchestration:MaxSteps` | `8` | Максимум шагов ReAct-цикла |
 | `Agent:Orchestration:ToolCallLimit` | `30` | Максимум вызовов инструментов |
 | `Agent:Orchestration:EnableFixPlanning` | `true` | Строить план правки |
+| `Agent:Orchestration:DomainContext` | пусто | Описание системы для промпта; пусто — нейтральный текст |
 
 ### Источники контекста
 
@@ -154,7 +170,7 @@ Docker и управление — в [`deploy/monitor-agent/`](../../deploy/mon
 Отключить (быстрее, без ~30 пакетов SK):
 
 ```bash
-dotnet build src/Tools/ArtasTools.slnx -p:EnableSemanticKernel=false
+dotnet build src/LLMMetrics/LLMNetHelper.slnx -p:EnableSemanticKernel=false
 ```
 
 Выбор в рантайме:
@@ -176,18 +192,18 @@ dotnet build src/Tools/ArtasTools.slnx -p:EnableSemanticKernel=false
 ## Тесты
 
 ```bash
-# Всё решение целиком (191 тест: 145 + 8 + 20 + 18)
-dotnet test src/Tools/ArtasTools.slnx
+# Всё решение целиком
+dotnet test src/LLMMetrics/LLMNetHelper.slnx
 
 # Только агент (офлайн, без Docker)
-dotnet test ArtasTools.MonitorAgent.Tests/ArtasTools.MonitorAgent.Tests.csproj
+dotnet test src/LLMMetrics/ArtasTools.MonitorAgent.Tests/ArtasTools.MonitorAgent.Tests.csproj
 
 # Только паритет SK-оркестратора
-dotnet test ArtasTools.MonitorAgent.Orchestration.SemanticKernel.Tests/ArtasTools.MonitorAgent.Orchestration.SemanticKernel.Tests.csproj
+dotnet test src/LLMMetrics/ArtasTools.MonitorAgent.Orchestration.SemanticKernel.Tests/ArtasTools.MonitorAgent.Orchestration.SemanticKernel.Tests.csproj
 ```
 
-Покрытие: **145** основных + **8** SK-паритетных тестов.
-Все офлайн — сеть и Docker не требуются.
+Все тесты офлайн — сеть и Docker не требуются. Актуальное количество показывает
+`dotnet test` решения; через раннер: `run_LLMMetrics.ps1 -Test`.
 
 ## Коды возврата
 

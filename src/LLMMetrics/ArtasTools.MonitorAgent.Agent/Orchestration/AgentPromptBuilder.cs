@@ -7,19 +7,34 @@ namespace ArtasTools.MonitorAgent.Agent.Orchestration;
 /// Сборка промптов агента.
 /// Промпты детерминированы и версионируются вместе с кодом — это требование
 /// воспроизводимости ночного прогона.
+/// <para>
+/// Предметная картина мира (что за система, её подсистемы и хранилища) НЕ зашита
+/// в код: она приходит из конфигурации (<c>Agent:Orchestration:DomainContext</c>).
+/// При пустом значении используется нейтральная формулировка — модель строит
+/// гипотезы только на фактах из сводки и документации.
+/// </para>
 /// </summary>
 public static class AgentPromptBuilder
 {
     /// <summary>
-    /// Системный промпт: роль, правила проекта, формат ответа.
+    /// Нейтральное доменное описание, используемое когда DomainContext не задан.
     /// </summary>
-    public static string BuildSystemPrompt(string toolDescriptions)
+    public const string NeutralDomainContext =
+        "Предметное описание системы в конфигурации не задано (Agent:Orchestration:DomainContext). " +
+        "Строй гипотезы исключительно на фактах из сводки и предоставленной документации; " +
+        "не додумывай архитектуру системы.";
+
+    /// <summary>
+    /// Системный промпт: роль, доменный контекст, правила проекта, формат ответа.
+    /// </summary>
+    public static string BuildSystemPrompt(string toolDescriptions, string? domainContext = null)
     {
         var sb = new StringBuilder();
 
-        sb.AppendLine("Ты — инженер по надёжности (SRE), анализирующий ночной отчёт о состоянии системы Artas2026.");
-        sb.AppendLine("Система собирает данные с финансовых рынков (поток тиков Finam gRPC → PostgreSQL),");
-        sb.AppendLine("считает статистику фракталов и пишет структурированные логи в Loki.");
+        sb.AppendLine("Ты — инженер по надёжности (SRE), анализирующий ночной отчёт о состоянии системы.");
+        sb.AppendLine();
+        sb.AppendLine("## Анализируемая система");
+        sb.AppendLine(string.IsNullOrWhiteSpace(domainContext) ? NeutralDomainContext : domainContext.Trim());
         sb.AppendLine();
         sb.AppendLine("## Твоя задача");
         sb.AppendLine("1. Определить, есть ли реальная проблема, и насколько она критична.");
@@ -32,11 +47,11 @@ public static class AgentPromptBuilder
         sb.AppendLine("Вызывай инструменты только по имени из списка выше. Других инструментов нет.");
         sb.AppendLine();
         sb.AppendLine("## Правила проекта (обязательны)");
-        sb.AppendLine("- Вся логика по UTC. МСК (UTC+3) — только для отображения. Не предлагай менять это.");
+        sb.AppendLine("- Вся логика времени — по UTC; локальное время используется только для отображения. Не предлагай менять это.");
         sb.AppendLine("- Внедрение зависимостей через Microsoft.Extensions.DependencyInjection.");
         sb.AppendLine("- Логирование структурированное, через ILogger.");
         sb.AppendLine("- Тесты — xUnit.");
-        sb.AppendLine("- Не предлагай правок, меняющих бизнес-логику расчёта фракталов без явных доказательств ошибки.");
+        sb.AppendLine("- Не предлагай правок, меняющих бизнес-логику, без явных доказательств ошибки в фактах.");
         sb.AppendLine();
         sb.AppendLine("## Ограничения правок");
         sb.AppendLine("Разрешены только две операции:");
