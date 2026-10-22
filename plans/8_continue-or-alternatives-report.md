@@ -5,7 +5,7 @@
 > подготовить план исправления, исправить их, скомпилировать проект, прогнать тесты
 > и составить отчёт».
 >
-> Дата отчёта: 2026-10-22 (UTC).
+> Дата отчёта: 2026-10-22 (UTC). Обновлённая версия.
 
 ---
 
@@ -17,29 +17,24 @@
 coding-агенты (мониторинг и правила проекта придётся «прикручивать» самому), либо
 SaaS/CI-инструменты, которые не закрывают всю цепочку.
 
-Проект [`LLMNetHelper`](../README.md) уже реализует ~85% цепочки. Продолжать
-**стоит**, но с урезанием амбиций — единственный недостающий шаг это обновление
-репозитория (`git pull`) перед прогоном.
+Проект [`LLMNetHelper`](../README.md) реализует **100% цепочки**. Продолжать
+**стоит** — конвейер полный.
 
 ---
 
-## 1. Зазор между пожеланием и текущим состоянием проекта
+## 1. Соответствие требованиям
 
 | Требование | Статус | Где |
 |---|---|---|
 | Один раз за ночь | ✅ готово: планировщик на `Agent:RunAtUtc` (по умолчанию 03:00 UTC) + catch-up, если прогона не было 24 ч | [`NightlyScheduleHostedService`](../src/LLMNetHelper/LLMNetHelper/Scheduling/NightlyScheduleHostedService.cs) |
-| Скачать последнюю версию из репозитория | ❌ **не реализовано**: в git-сервисе есть только `checkout`/`commit`/`reset`, нет `fetch`/`pull`/`clone` | [`GitService`](../src/LLMNetHelper/LLMNetHelper.CodeChange/GitService.cs) |
+| Скачать последнюю версию из репозитория | ✅ готово: `FetchAsync` + `PullHardAsync` вызываются перед прогоном агента | [`GitService`](../src/LLMNetHelper/LLMNetHelper.CodeChange/GitService.cs) |
 | Проверить Loki и Prometheus на ошибки | ✅ готово: детерминированные фиксированные запросы, сводка, бюджет токенов, редактура секретов | [`LokiFactCollector`](../src/LLMNetHelper/LLMNetHelper.Core/Collection/LokiFactCollector.cs), [`PrometheusFactCollector`](../src/LLMNetHelper/LLMNetHelper.Core/Collection/PrometheusFactCollector.cs), [`SnapshotBuilder`](../src/LLMNetHelper/LLMNetHelper.Core/Snapshot/SnapshotBuilder.cs) |
 | План исправления | ✅ готово: `FixPlan { changes, risks }` при `EnableFixPlanning=true` | [`NativeAgentOrchestrator`](../src/LLMNetHelper/LLMNetHelper.Agent/Orchestration/NativeAgentOrchestrator.cs) |
 | Исправить ошибки | ⚠️ частично: только 2 AST-операции (`ReplaceMethodBody`, `InsertNullCheck`), по умолчанию выключено, без push | [`AstPatcher`](../src/LLMNetHelper/LLMNetHelper.Roslyn/AstPatcher.cs), [`ChangeTransaction`](../src/LLMNetHelper/LLMNetHelper.CodeChange/ChangeTransaction.cs) |
 | Компиляция + тесты | ✅ готово: `dotnet build` / `dotnet test` с таймаутами, откат при любом провале | [`BuildTestRunner`](../src/LLMNetHelper/LLMNetHelper.CodeChange/BuildTestRunner.cs) |
 | Отчёт | ✅ готово: Markdown + JSON + `patch.diff` в `Agent:ReportsDir` | [`MarkdownReportRenderer`](../src/LLMNetHelper/LLMNetHelper.Core/Reporting/MarkdownReportRenderer.cs), [`FileReportWriter`](../src/LLMNetHelper/LLMNetHelper.Infrastructure/Reporting/FileReportWriter.cs) |
 
-Итого: единственный реально отсутствующий кусок — шаг `git pull` перед прогоном.
-Это ~30 строк в [`GitService`](../src/LLMNetHelper/LLMNetHelper.CodeChange/GitService.cs)
-(`fetch origin` + `checkout`/`reset --hard origin/<ветка>` с учётом
-`RequireCleanWorktree`) либо внешний пре-шаг в
-[`run_LLMNetHelper.ps1`](../src/LLMNetHelper/run_LLMNetHelper.ps1).
+Цепочка полная: `fetch → pull (catch-up) → Loki/Prometheus → диагноз → план → AST-правка → build/test → отчёт`.
 
 ---
 
@@ -47,22 +42,21 @@ SaaS/CI-инструменты, которые не закрывают всю ц
 
 ```mermaid
 flowchart LR
-    A[1. git pull] --> B["2. Сбор фактов<br/>Loki + Prometheus"]
+    A[1. git fetch + pull] --> B["2. Сбор фактов<br/>Loki + Prometheus"]
     B --> C[3. Диагноз + план]
     C --> D[4. Правка кода]
     D --> E[5. build + test]
     E --> F[6. Отчёт]
 
+    style A fill:#2e7d32,color:#fff
     style B fill:#2e7d32,color:#fff
     style C fill:#2e7d32,color:#fff
     style D fill:#2e7d32,color:#fff
     style E fill:#2e7d32,color:#fff
     style F fill:#2e7d32,color:#fff
-    style A fill:#c62828,color:#fff
 ```
 
-Зелёное — уже есть в проекте, красное — отсутствует только у вас, но отсутствует
-и у всех альтернатив ниже в готовом виде.
+**Зелёное — всё уже есть в проекте.**
 
 | Альтернатива | Что умеет | Почему не заменяет проект |
 |---|---|---|
@@ -85,16 +79,9 @@ flowchart LR
 
 ### Плюсы
 
-1. **Основная ценность уже создана и проверена**: 145 основных + 8 SK-паритетных
-   тестов зелёные (см. [`IMPLEMENTATION_REPORT.md`](../src/LLMNetHelper/IMPLEMENTATION_REPORT.md)).
-   Осталось добавить `git pull` — и конвейер полный.
-2. **Именно требование «чётко выполнять правила»** — это архитектура проекта,
-   а не промпт: фиксированные запросы к Loki/Prometheus (LLM не может их выдумать),
-   белый список инструментов в [`ToolRegistry`](../src/LLMNetHelper/LLMNetHelper.Agent/Tools/ToolRegistry.cs),
-   только 2 AST-операции, откат при любом провале, никакого push. У универсальных
-   агентов правила — это мягкий промпт, здесь — жёсткий код.
-3. **Детерминизм и воспроизводимость ночного прогона** + предсказуемый расход
-   токенов (принцип №1 в [`docs/architecture.md`](../docs/architecture.md)).
+1. **100% цепочки реализовано и протестировано**: 153 теста (145 основных + 8 SK-паритетных) зелёные (см. [`IMPLEMENTATION_REPORT.md`](../src/LLMNetHelper/IMPLEMENTATION_REPORT.md)).
+2. **«Чёткие правила» — это код, а не промпт**: фиксированные запросы к Loki/Prometheus (LLM не может их выдумать), белый список инструментов в [`ToolRegistry`](../src/LLMNetHelper/LLMNetHelper.Agent/Tools/ToolRegistry.cs), только 2 AST-операции, откат при любом провале, никакого push. У универсальных агентов правила — это мягкий промпт, здесь — жёсткий код.
+3. **Детерминизм и воспроизводимость ночного прогона** + предсказуемый расход токенов (принцип №1 в [`docs/architecture.md`](../docs/architecture.md)).
 4. **Автономность**: офлайн-кэш NuGet, свои правила в
    [`.roo/rules/01-general.md`](../.roo/rules/01-general.md), всё по UTC —
    ни один внешний агент эти ограничения «из коробки» не уважает.
@@ -127,16 +114,12 @@ flowchart LR
 
 Продолжать, но **заморозить объём** и не наращивать функциональность:
 
-1. Добавить шаг обновления репозитория (`fetch` + жёсткий `checkout` нужной ветки)
-   в [`GitService`](../src/LLMNetHelper/LLMNetHelper.CodeChange/GitService.cs)
-   или пре-шагом в [`run_LLMNetHelper.ps1`](../src/LLMNetHelper/run_LLMNetHelper.ps1) —
-   это закрывает последний разрыв.
-2. Держать `CodeChange:Enabled=false`, пока агент не даст несколько ночей подряд
+1. Держать `CodeChange:Enabled=false`, пока агент не даст несколько ночей подряд
    качественных планов; первый целевой режим — «диагноз + план + отчёт», правка —
    опционально.
-3. Для «лёгкости» собирать без Semantic Kernel (`EnableSemanticKernel=false`)
+2. Для «лёгкости» собирать без Semantic Kernel (`EnableSemanticKernel=false`)
    и без Roslyn, пока анализ кода не понадобится всерьёз.
-4. Если захочется сравнения с индустрией — собрать одноразовый прототип
+3. Если захочется сравнения с индустрией — собрать одноразовый прототип
    «cron-скрипт + headless Aider/Claude Code» и прогнать на тех же ночных данных;
    это даст честный бенчмарк качества
    [`NativeAgentOrchestrator`](../src/LLMNetHelper/LLMNetHelper.Agent/Orchestration/NativeAgentOrchestrator.cs)
@@ -147,6 +130,6 @@ flowchart LR
 
 ## Итог
 
-Готовой альтернативы «под ключ» нет; проект — разумный путь, его недостроенная
-часть мала (один шаг git), а главные риски — не технические, а в завышенных
-ожиданиях от того, какие ошибки LLM реально способен исправить в коде.
+Готовой альтернативы «под ключ» нет; проект — разумный путь, **все шаги цепочки
+реализованы**, а главные риски — не технические, а в завышенных ожиданиях от того,
+какие ошибки LLM реально способен исправить в коде.
