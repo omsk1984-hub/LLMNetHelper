@@ -11,6 +11,7 @@ using LLMNetHelper.Running;
 using LLMNetHelper.Roslyn;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Serilog.Context;
 
 namespace LLMNetHelper;
 
@@ -74,43 +75,53 @@ public sealed class AgentRunner : IAgentRunner
         var windowTo = DateTime.UtcNow;
         var windowFrom = since ?? windowTo.AddHours(-(hours ?? _options.Value.WindowHours));
 
-        _logger.LogInformation(
-            "Начало прогона агента: окно {From:o} — {To:o}, dry-run={DryRun}, catch-up={CatchUp}",
-            windowFrom, windowTo, dryRun, catchUp);
-
-        var runId = await _factStore.CreateRunAsync(
-            windowFrom.ToString("o"), windowTo.ToString("o"), ct).ConfigureAwait(false);
-
-        try
+        // Корреляция логов с прогоном
+        using (LogContext.PushProperty("RunId", (long?)null))
+        using (LogContext.PushProperty("DryRun", dryRun))
+        using (LogContext.PushProperty("CatchUp", catchUp))
         {
-            // Делегируем пайплайну
-            var context = await _pipeline
-                .ExecuteAsync(runId, windowFrom, windowTo, dryRun, ct)
-                .ConfigureAwait(false);
+            _logger.LogInformation(
+                "Начало прогона агента: окно {From:o} — {To:o}, dry-run={DryRun}, catch-up={CatchUp}",
+                windowFrom, windowTo, dryRun, catchUp);
 
-            // Dry-run завершается после snapshot (шаг BuildSnapshot проверяет flag)
-            if (dryRun)
+            var runId = await _factStore.CreateRunAsync(
+                windowFrom.ToString("o"), windowTo.ToString("o"), ct).ConfigureAwait(false);
+
+            // Обновляем correlation scope с реальным runId
+            using (LogContext.PushProperty("RunId", runId))
             {
-                await _factStore.FinishRunAsync(runId, "ok", "OK", null, ct).ConfigureAwait(false);
-                return 0;
+                try
+                {
+                    // Делегируем пайплайну
+                    var context = await _pipeline
+                        .ExecuteAsync(runId, windowFrom, windowTo, dryRun, ct)
+                        .ConfigureAwait(false);
+
+                    // Dry-run завершается после snapshot (шаг BuildSnapshot проверяет flag)
+                    if (dryRun)
+                    {
+                        await _factStore.FinishRunAsync(runId, "ok", "OK", null, ct).ConfigureAwait(false);
+                        return 0;
+                    }
+
+                    var verdict = context.Diagnosis?.Verdict ?? "UNKNOWN";
+                    _logger.LogInformation("Вердикт прогона: {Verdict}", verdict);
+
+                    return verdict == "CRITICAL" ? 2 : 0;
+                }
+                catch (OperationCanceledException)
+                {
+                    await _factStore.FinishRunAsync(runId, "failed", null, "отменено", CancellationToken.None)
+                        .ConfigureAwait(false);
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Сбой прогона агента");
+                    await _factStore.FinishRunAsync(runId, "failed", null, ex.Message, ct).ConfigureAwait(false);
+                    return 1;
+                }
             }
-
-            var verdict = context.Diagnosis?.Verdict ?? "UNKNOWN";
-            _logger.LogInformation("Вердикт прогона: {Verdict}", verdict);
-
-            return verdict == "CRITICAL" ? 2 : 0;
-        }
-        catch (OperationCanceledException)
-        {
-            await _factStore.FinishRunAsync(runId, "failed", null, "отменено", CancellationToken.None)
-                .ConfigureAwait(false);
-            throw;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Сбой прогона агента");
-            await _factStore.FinishRunAsync(runId, "failed", null, ex.Message, ct).ConfigureAwait(false);
-            return 1;
         }
     }
 }

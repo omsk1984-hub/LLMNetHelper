@@ -4,6 +4,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Serilog;
 
 namespace LLMNetHelper;
 
@@ -22,9 +23,15 @@ internal static class Program
             })
             .ConfigureLogging(logging =>
             {
+                // --- Serilog ---
+                Log.Logger = LoggingConfig.CreateLogger(
+                    logDir: "logs",
+                    retentionDays: 30,
+                    errorRetentionDays: 90,
+                    enabled: true);
+
                 logging.ClearProviders();
-                logging.AddConsole();
-                logging.SetMinimumLevel(LogLevel.Information);
+                logging.AddSerilog();
             })
             .ConfigureServices((hostContext, services) =>
             {
@@ -32,34 +39,42 @@ internal static class Program
             })
             .Build();
 
-        var runNow = args.Contains("--run-now");
-        var dryRun = args.Contains("--dry-run");
-
-        if (runNow || dryRun)
+        try
         {
-            Console.WriteLine(dryRun
-                ? "[INFO] Dry-run: собираем факты и сводку, LLM не вызывается"
-                : "[INFO] Запуск по команде --run-now...");
+            var runNow = args.Contains("--run-now");
+            var dryRun = args.Contains("--dry-run");
 
-            var agentRunner = host.Services.GetRequiredService<IAgentRunner>();
-
-            // Инициализация хранилища (WAL + миграции) обязательна ДО первого прогона.
-            var factStore = host.Services.GetRequiredService<Abstractions.IFactStore>();
-            await factStore.InitializeAsync(CancellationToken.None);
-
-            try
+            if (runNow || dryRun)
             {
-                return await agentRunner.RunAsync(dryRun, catchUp: false, since: null, hours: null, CancellationToken.None);
+                Console.WriteLine(dryRun
+                    ? "[INFO] Dry-run: собираем факты и сводку, LLM не вызывается"
+                    : "[INFO] Запуск по команде --run-now...");
+
+                var agentRunner = host.Services.GetRequiredService<IAgentRunner>();
+
+                // Инициализация хранилища (WAL + миграции) обязательна ДО первого прогона.
+                var factStore = host.Services.GetRequiredService<Abstractions.IFactStore>();
+                await factStore.InitializeAsync(CancellationToken.None);
+
+                try
+                {
+                    return await agentRunner.RunAsync(dryRun, catchUp: false, since: null, hours: null, CancellationToken.None);
+                }
+                catch (OperationCanceledException)
+                {
+                    Console.WriteLine("[ERROR] Прогон отменён");
+                    return 1;
+                }
             }
-            catch (OperationCanceledException)
-            {
-                Console.WriteLine("[ERROR] Прогон отменён");
-                return 1;
-            }
+
+            // Запуск хоста (включает NightlyScheduleHostedService + HealthServer)
+            await host.RunAsync();
+            return 0;
         }
-
-        // Запуск хоста (включает NightlyScheduleHostedService + HealthServer)
-        await host.RunAsync();
-        return 0;
+        finally
+        {
+            // Корректное закрытие логгера при остановке
+            Log.CloseAndFlush();
+        }
     }
 }
