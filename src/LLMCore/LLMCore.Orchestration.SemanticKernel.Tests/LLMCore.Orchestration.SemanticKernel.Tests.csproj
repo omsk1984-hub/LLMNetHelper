@@ -10,8 +10,8 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <IsTestProject>true</IsTestProject>
-    <AssemblyName>LLMNetHelper.Orchestration.SemanticKernel.Tests</AssemblyName>
-    <RootNamespace>LLMNetHelper.Orchestration.SemanticKernel.Tests</RootNamespace>
+    <AssemblyName>LLMCore.Orchestration.SemanticKernel.Tests</AssemblyName>
+    <RootNamespace>LLMCore.Orchestration.SemanticKernel.Tests</RootNamespace>
 
     <EnableSemanticKernel Condition="'$(EnableSemanticKernel)' == ''">true</EnableSemanticKernel>
     <DefineConstants Condition="'$(EnableSemanticKernel)' == 'true'">$(DefineConstants);SK_ENABLED</DefineConstants>

@@ -6,7 +6,7 @@ using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
-namespace LLMNetHelper.Orchestration.SemanticKernel;
+namespace LLMCore.Orchestration.SemanticKernel;
 
 /// <summary>
 /// Регистрация SK-оркестратора.

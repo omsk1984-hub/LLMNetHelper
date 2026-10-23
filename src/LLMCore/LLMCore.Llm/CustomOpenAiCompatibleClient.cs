@@ -4,7 +4,7 @@ using System.Text.Json;
 using LLMNetHelper.Abstractions;
 using Microsoft.Extensions.Options;
 
-namespace LLMNetHelper.Llm;
+namespace LLMCore.Llm;
 
 /// <summary>
 /// Реализация A: собственный HTTP-клиент для [OI]-совместимого API.

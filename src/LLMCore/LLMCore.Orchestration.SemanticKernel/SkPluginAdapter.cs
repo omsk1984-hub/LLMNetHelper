@@ -3,7 +3,7 @@
 using LLMNetHelper.Abstractions;
 using Microsoft.SemanticKernel;
 
-namespace LLMNetHelper.Orchestration.SemanticKernel;
+namespace LLMCore.Orchestration.SemanticKernel;
 
 /// <summary>
 /// Адаптер <see cref="IAgentTool"/> → <see cref="KernelFunction"/>.

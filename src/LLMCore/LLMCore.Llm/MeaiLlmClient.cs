@@ -3,7 +3,7 @@ using LLMNetHelper.Abstractions;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Options;
 
-namespace LLMNetHelper.Llm;
+namespace LLMCore.Llm;
 
 /// <summary>
 /// Реализация B: Microsoft.Extensions.AI 10.5.0.

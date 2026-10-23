@@ -14,8 +14,8 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <AssemblyName>LLMNetHelper.Orchestration.SemanticKernel</AssemblyName>
-    <RootNamespace>LLMNetHelper.Orchestration.SemanticKernel</RootNamespace>
+    <AssemblyName>LLMCore.Orchestration.SemanticKernel</AssemblyName>
+    <RootNamespace>LLMCore.Orchestration.SemanticKernel</RootNamespace>
 
     <!-- Флаг включения SK -->
     <EnableSemanticKernel Condition="'$(EnableSemanticKernel)' == ''">true</EnableSemanticKernel>

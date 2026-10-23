@@ -3,11 +3,11 @@
 using LLMNetHelper.Abstractions;
 using LLMNetHelper.Agent.Orchestration;
 using LLMNetHelper.Agent.Tools;
-using LLMNetHelper.Orchestration.SemanticKernel;
+using LLMCore.Orchestration.SemanticKernel;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging.Abstractions;
 
-namespace LLMNetHelper.Orchestration.SemanticKernel.Tests;
+namespace LLMCore.Orchestration.SemanticKernel.Tests;
 
 /// <summary>
 /// Паритетные тесты: нативный и SK-оркестраторы на одинаковом ответе модели

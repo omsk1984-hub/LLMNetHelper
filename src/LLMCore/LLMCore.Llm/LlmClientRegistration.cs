@@ -5,7 +5,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
-namespace LLMNetHelper.Llm;
+namespace LLMCore.Llm;
 
 /// <summary>
 /// Регистрация LLM-клиентов в DI.

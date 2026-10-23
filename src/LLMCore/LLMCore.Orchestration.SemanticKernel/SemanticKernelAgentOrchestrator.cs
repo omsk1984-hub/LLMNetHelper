@@ -7,7 +7,7 @@ using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
 
-namespace LLMNetHelper.Orchestration.SemanticKernel;
+namespace LLMCore.Orchestration.SemanticKernel;
 
 /// <summary>
 /// Реализация <see cref="IAgentOrchestrator"/> на Semantic Kernel 1.81.0.

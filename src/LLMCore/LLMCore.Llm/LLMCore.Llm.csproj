@@ -4,8 +4,8 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <AssemblyName>LLMNetHelper.Llm</AssemblyName>
-    <RootNamespace>LLMNetHelper.Llm</RootNamespace>
+    <AssemblyName>LLMCore.Llm</AssemblyName>
+    <RootNamespace>LLMCore.Llm</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>
