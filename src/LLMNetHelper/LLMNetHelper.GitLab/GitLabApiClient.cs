@@ -24,8 +24,83 @@ public sealed class GitLabApiClient : IDisposable
     {
         _options = options;
         _http = http;
-        _http.BaseAddress = new Uri(options.ApiUrl);
+
+        // Завершающий слэш обязателен: относительные запросы вида "user"
+        // иначе отбрасывают "/api/v4" из базового адреса (Uri.Combine
+        // с ведущим слэшем заменяет путь целиком) — GitLab возвращал HTML
+        // страницы логина вместо JSON.
+        var baseUrl = options.ApiUrl.EndsWith('/')
+            ? options.ApiUrl
+            : options.ApiUrl + "/";
+
+        _http.BaseAddress = new Uri(baseUrl);
         _http.DefaultRequestHeaders.Add("PRIVATE-TOKEN", options.Token);
+
+        // Без явного Accept GitLab трактует запрос как браузерную навигацию
+        // и отдаёт HTML-страницу логина (200, но не JSON).
+        _http.DefaultRequestHeaders.Accept.ParseAdd("application/json");
+    }
+
+    /// <summary>
+    /// Получает профиль текущего пользователя (<c>GET /user</c>).
+    /// <para>
+    /// Используется для проверки валидности токена: невалидный токен даёт
+    /// 401 и <see cref="HttpRequestException"/>.
+    /// </para>
+    /// </summary>
+    public async Task<GitLabUser> GetCurrentUserAsync(CancellationToken ct = default)
+    {
+        var response = await _http.GetStringAsync("user", ct).ConfigureAwait(false);
+
+        var user = JsonSerializer.Deserialize<GitLabUser>(response, _jsonOpts)
+            ?? throw new InvalidOperationException("GitLab API вернул пустой ответ /user.");
+
+        return user;
+    }
+
+    /// <summary>
+    /// Ищет группу по полному пути (<c>GET /groups?search=...</c>).
+    /// <para>
+    /// GitLab-параметр <c>search</c> ищет по подстроке имени, поэтому после
+    /// запроса выполняется точное сравнение <c>full_path</c> (без учёта регистра).
+    /// </para>
+    /// </summary>
+    /// <param name="fullPath">Полный путь группы, например "GPM/backend".</param>
+    /// <returns>Найденная группа или <c>null</c>, если группы с таким путём нет.</returns>
+    public async Task<GitLabGroup?> FindGroupByPathAsync(string fullPath, CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(fullPath);
+
+        // Ищем по последнему сегменту пути — так результат заметно уже,
+        // а точное совпадение full_path ниже отсекает ложные попадания.
+        var lastSegment = fullPath[(fullPath.LastIndexOf('/') + 1)..];
+        var encoded = Uri.EscapeDataString(lastSegment);
+
+        int page = 1;
+        const int perPage = 100;
+
+        while (true)
+        {
+            var url = $"groups?search={encoded}&per_page={perPage}&page={page}";
+            var response = await _http.GetStringAsync(url, ct).ConfigureAwait(false);
+
+            var groups = JsonSerializer.Deserialize<GitLabGroup[]>(response, _jsonOpts) ?? [];
+
+            var match = groups.FirstOrDefault(g =>
+                string.Equals(g.FullPath, fullPath, StringComparison.OrdinalIgnoreCase));
+
+            if (match != null)
+            {
+                return match;
+            }
+
+            if (groups.Length < perPage)
+            {
+                return null;
+            }
+
+            page++;
+        }
     }
 
     /// <summary>
@@ -39,7 +114,7 @@ public sealed class GitLabApiClient : IDisposable
 
         while (true)
         {
-            var url = $"/groups/{groupId}/projects?per_page={perPage}&page={page}&include_subgroups=true&simple=true";
+            var url = $"groups/{groupId}/projects?per_page={perPage}&page={page}&include_subgroups=true&simple=true";
             var response = await _http.GetStringAsync(url, ct).ConfigureAwait(false);
 
             var projects = JsonSerializer.Deserialize<GitLabProject[]>(response, _jsonOpts) ?? [];

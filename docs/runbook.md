@@ -95,3 +95,25 @@ dotnet test src/LLMNetHelper/LLMNetHelper.slnx
 
 Все тесты офлайн: сеть и Docker не требуются. Фейковые `IChatClient`
 (ScriptedChatClient) покрывают оркестраторы без реальных вызовов LLM.
+
+### Интеграционные тесты (сеть)
+
+Исключение — тесты с трейтом `Category=Integration`. В обычном прогоне они
+имеют статус **Skipped** (не Failed), поэтому офлайн-прогон не ломается.
+
+GitLab-интеграция (`LLMNetHelper.Tests/GitLab/GitLabIntegrationTests.cs`)
+проверяет реально: валидность токена (`GET user`), доступность группы
+`GPM/backend` (`GET groups?search=`) и список проектов группы
+(`GET groups/{id}/projects`). Выполняется только при обоих условиях:
+
+- `GITLAB__INTEGRATION=1` в окружении;
+- токен `GITLAB__TOKEN` (из окружения или `src/LLMNetHelper/.env`).
+
+```powershell
+$env:GITLAB__INTEGRATION='1'
+dotnet test src/LLMNetHelper/LLMNetHelper.slnx --filter Category=Integration
+```
+
+Примечание: фикстура фиксирует TLS 1.2 — TLS 1.3 в локальном SChannel при
+рукопожатии с `gitlab.intellt.ru` падает с `Win32Exception 0x80004005`
+(«Не удается установить связь с локальной системой безопасности»).

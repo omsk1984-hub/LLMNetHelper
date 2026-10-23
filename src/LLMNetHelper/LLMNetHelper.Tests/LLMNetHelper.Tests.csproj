@@ -23,6 +23,7 @@
     <ProjectReference Include="..\LLMNetHelper.Roslyn\LLMNetHelper.Roslyn.csproj" />
     <ProjectReference Include="..\LLMNetHelper.CodeChange\LLMNetHelper.CodeChange.csproj" />
     <ProjectReference Include="..\LLMNetHelper.Agent\LLMNetHelper.Agent.csproj" />
+    <ProjectReference Include="..\LLMNetHelper.GitLab\LLMNetHelper.GitLab.csproj" />
   </ItemGroup>
 
   <ItemGroup>
