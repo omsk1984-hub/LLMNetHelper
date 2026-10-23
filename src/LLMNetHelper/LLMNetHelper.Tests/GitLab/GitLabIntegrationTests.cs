@@ -94,6 +94,46 @@ public sealed class GitLabIntegrationTests
             Assert.False(string.IsNullOrWhiteSpace(repo.HttpUrlToRepo));
         }
     }
+
+    /// <summary>
+    /// Архивные проекты группы исключаются (<see cref="GitLabOptions.ExcludeArchived"/>
+    /// по умолчанию <c>true</c>): GitLab отдаёт их наравне с боевыми, и без фильтрации
+    /// они попадают в локальные клоны.
+    /// </summary>
+    [GitLabIntegrationFact]
+    [Trait("Category", "Integration")]
+    public async Task GetGroupRepos_ExcludesArchivedByDefault()
+    {
+        using var fixture = new GitLabFixture();
+
+        var group = await fixture.Client.FindGroupByPathAsync(fixture.Options.GroupName);
+        Assert.NotNull(group);
+
+        Assert.True(fixture.Options.ExcludeArchived);
+
+        var repos = await fixture.Client.GetGroupReposAsync(group!.Id);
+
+        Assert.NotEmpty(repos);
+        Assert.DoesNotContain(repos, static p => p.Archived);
+    }
+
+    /// <summary>
+    /// При <see cref="GitLabOptions.ExcludeArchived"/>=<c>false</c> архивные проекты
+    /// возвращаются — фильтр отключается осознанно, а не навсегда.
+    /// </summary>
+    [GitLabIntegrationFact]
+    [Trait("Category", "Integration")]
+    public async Task GetGroupRepos_IncludesArchivedWhenFilterDisabled()
+    {
+        using var fixture = new GitLabFixture(excludeArchived: false);
+
+        var group = await fixture.Client.FindGroupByPathAsync(fixture.Options.GroupName);
+        Assert.NotNull(group);
+
+        var repos = await fixture.Client.GetGroupReposAsync(group!.Id);
+
+        Assert.Contains(repos, static p => p.Archived);
+    }
 }
 
 /// <summary>
@@ -317,9 +357,10 @@ internal sealed class GitLabFixture : IDisposable
 {
     private readonly HttpClient _http;
 
-    public GitLabFixture()
+    public GitLabFixture(bool excludeArchived = true)
     {
         Options = GitLabIntegrationEnv.RequireOptions();
+        Options.ExcludeArchived = excludeArchived;
 
         var handler = new HttpClientHandler
         {

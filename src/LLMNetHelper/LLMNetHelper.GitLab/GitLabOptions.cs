@@ -24,6 +24,18 @@ public sealed class GitLabOptions
     /// <summary>Название группы (для логов, например "GPM/backend").</summary>
     public string GroupName { get; set; } = "";
 
+    /// <summary>
+    /// Иключать ли архивные проекты группы (по умолчанию <c>true</c>).
+    /// <para>
+    /// GitLab по умолчанию возвращает архивные проекты наравне с боевыми —
+    /// в группе <c>GPM/backend</c> их 43 из 103. Фильтрация делается серверным
+    /// параметром <c>archived=false</c>: документированный для GitLab
+    /// <c>exclude_archived=true</c> на проверенной версии (19.2.9)
+    /// <b>игнорируется</b> и ничего не исключает.
+    /// </para>
+    /// </summary>
+    public bool ExcludeArchived { get; set; } = true;
+
     /// <summary>Токен для доступа к GitLab API.</summary>
     public string Token { get; set; } = "";
 

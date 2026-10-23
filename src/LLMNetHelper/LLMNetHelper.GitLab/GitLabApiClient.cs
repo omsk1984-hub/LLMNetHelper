@@ -104,7 +104,15 @@ public sealed class GitLabApiClient : IDisposable
     }
 
     /// <summary>
-    /// Получает все репозитории группы с автопагинацией.
+    /// Получает репозитории группы с автопагинацией.
+    /// <para>
+    /// Архивные проекты исключаются, если <see cref="GitLabOptions.ExcludeArchived"/>
+    /// (= по умолчанию <c>true</c>): GitLab отдаёт их наравне с боевыми, и в группе
+    /// <c>GPM/backend</c> это 43 из 103 репозиториев. Фильтрация — серверным
+    /// параметром <c>archived=false</c> плюс клиентская страховка, потому что
+    /// документированный для GitLab <c>exclude_archived=true</c> на проверенной
+    /// версии 19.2.9 игнорируется.
+    /// </para>
     /// </summary>
     public async Task<IReadOnlyList<GitLabProject>> GetGroupReposAsync(int groupId, CancellationToken ct = default)
     {
@@ -112,9 +120,15 @@ public sealed class GitLabApiClient : IDisposable
         int page = 1;
         const int perPage = 100;
 
+        var archivedQuery = _options.ExcludeArchived ? "&archived=false" : "";
+
         while (true)
         {
-            var url = $"groups/{groupId}/projects?per_page={perPage}&page={page}&include_subgroups=true&simple=true";
+            // simple=true НЕ используется: в «простом» представлении GitLab не отдаёт
+            // поле archived (проверено на 19.2.9), и клиентская страховка
+            // фильтрации становилась бы пустой. Модель десериализует только
+            // объявленные поля, поэтому раздутый ответ не проблема.
+            var url = $"groups/{groupId}/projects?per_page={perPage}&page={page}&include_subgroups=true{archivedQuery}";
             var response = await _http.GetStringAsync(url, ct).ConfigureAwait(false);
 
             var projects = JsonSerializer.Deserialize<GitLabProject[]>(response, _jsonOpts) ?? [];
@@ -122,6 +136,12 @@ public sealed class GitLabApiClient : IDisposable
             if (projects.Length == 0)
             {
                 break;
+            }
+
+            // Страховка на случай, если сервер параметр проигнорирует.
+            if (_options.ExcludeArchived)
+            {
+                projects = projects.Where(static p => !p.Archived).ToArray();
             }
 
             repos.AddRange(projects);

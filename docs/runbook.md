@@ -101,7 +101,15 @@ pwsh -NoProfile -Command "[Console]::OutputEncoding=[Text.Encoding]::UTF8; $Outp
   - `TlsProtocols = "Tls12"` — на хостах, где TLS 1.3 в SChannel падает при
     рукопожатии с `gitlab.intellt.ru` (`Win32Exception 0x80004005`);
   - `AllowLongPaths = true` — `core.longpaths` для git-процессов, иначе
-    репозитории с путями > 260 символов не распаковываются («File name too long»).
+    репозитории с путями > 260 символов не распаковываются («File name too long»);
+  - `ExcludeArchived = true` — архивные проекты группы не скачиваются. В
+    `GPM/backend` их 43 из 103 (в том числе `test_service` → клон
+    `repos/GPM/TEST_SERVICE`). Фильтрация идёт серверным параметром
+    `archived=false` плюс клиентская страховка по полю `archived`, потому что
+    документированный для GitLab `exclude_archived=true` на версии 19.2.9
+    **игнорируется**, а запрос с `simple=true` поле `archived` не возвращает
+    (поэтому из URL он убран). Вернуть архивные в прогон:
+    `GITLAB__EXCLUDEARCHIVED=false`.
 
 ### Проверка конфигурации перед включением правок
 1. `CODECHANGE__ENABLED=false` — дефолт, не менять «на всякий случай».

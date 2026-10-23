@@ -19,6 +19,7 @@ namespace LLMNetHelper.GitLab;
 /// <param name="LastActivityAt">Последняя активность (ISO 8601).</param>
 /// <param name="OpenIssuesCount">Количество открытых issue.</param>
 /// <param name="StarsCount">Количество звёзд.</param>
+/// <param name="Archived">Архивный ли проект (GitLab возвращает такие наравне с боевыми).</param>
 public sealed record GitLabProject(
     int Id,
     string Name,
@@ -28,4 +29,5 @@ public sealed record GitLabProject(
     [property: JsonPropertyName("default_branch")] string DefaultBranch,
     [property: JsonPropertyName("last_activity_at")] string? LastActivityAt,
     [property: JsonPropertyName("open_issues_count")] int OpenIssuesCount,
-    [property: JsonPropertyName("stars_count")] int StarsCount);
+    [property: JsonPropertyName("stars_count")] int StarsCount,
+    bool Archived = false);
