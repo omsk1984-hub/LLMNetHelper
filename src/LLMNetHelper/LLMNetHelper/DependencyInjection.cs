@@ -6,6 +6,7 @@ using LLMNetHelper.Context;
 using LLMNetHelper.Core.Collection;
 using LLMNetHelper.Core.Snapshot;
 using LLMNetHelper.Core.Storage;
+using LLMNetHelper.GitLab;
 using LLMNetHelper.Health;
 using LLMNetHelper.Infrastructure.Context;
 using LLMNetHelper.Infrastructure.Loki;
@@ -48,6 +49,8 @@ public static class DependencyInjection
             ?? new RoslynOptions();
         var codeChangeOptions = configuration.GetSection(CodeChangeOptions.SectionName).Get<CodeChangeOptions>()
             ?? new CodeChangeOptions();
+        var gitLabOptions = configuration.GetSection(GitLabOptions.SectionName).Get<GitLabOptions>()
+            ?? new GitLabOptions();
         var orchestrationOptions = configuration
             .GetSection(AgentOrchestrationOptions.SectionName)
             .Get<AgentOrchestrationOptions>()
@@ -97,6 +100,13 @@ public static class DependencyInjection
 
         // --- Применение правок ---
         services.AddCodeChange(codeChangeOptions);
+
+        // --- GitLab: клонирование и обновление репозиториев ---
+        services.AddSingleton(gitLabOptions);
+        if (gitLabOptions.Enabled)
+        {
+            services.AddGitLab();
+        }
 
         // --- Шаги прогона ---
         services.AddSingleton<IRunStep, CollectLokiStep>();

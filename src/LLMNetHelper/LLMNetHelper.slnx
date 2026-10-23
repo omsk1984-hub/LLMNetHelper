@@ -4,6 +4,7 @@
   <Project Path="LLMNetHelper.CodeChange/LLMNetHelper.CodeChange.csproj" />
   <Project Path="LLMNetHelper.Context/LLMNetHelper.Context.csproj" />
   <Project Path="LLMNetHelper.Core/LLMNetHelper.Core.csproj" />
+  <Project Path="LLMNetHelper.GitLab/LLMNetHelper.GitLab.csproj" />
   <Project Path="LLMNetHelper.Infrastructure/LLMNetHelper.Infrastructure.csproj" />
   <Project Path="LLMNetHelper.Llm/LLMNetHelper.Llm.csproj" />
   <Project Path="LLMNetHelper.Orchestration.SemanticKernel.Tests/LLMNetHelper.Orchestration.SemanticKernel.Tests.csproj" />
