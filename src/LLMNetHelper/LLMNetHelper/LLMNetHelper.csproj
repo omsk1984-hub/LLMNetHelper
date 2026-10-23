@@ -12,7 +12,7 @@
   <ItemGroup>
     <ProjectReference Include="..\LLMNetHelper.Abstractions\LLMNetHelper.Abstractions.csproj" />
     <ProjectReference Include="..\LLMNetHelper.Core\LLMNetHelper.Core.csproj" />
-    <ProjectReference Include="..\LLMNetHelper.Llm\LLMNetHelper.Llm.csproj" />
+    <ProjectReference Include="..\..\LLMCore\LLMNetHelper.Llm\LLMNetHelper.Llm.csproj" />
     <ProjectReference Include="..\LLMNetHelper.Infrastructure\LLMNetHelper.Infrastructure.csproj" />
     <ProjectReference Include="..\LLMNetHelper.Context\LLMNetHelper.Context.csproj" />
     <ProjectReference Include="..\LLMNetHelper.Roslyn\LLMNetHelper.Roslyn.csproj" />

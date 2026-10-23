@@ -23,8 +23,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\LLMNetHelper.Abstractions\LLMNetHelper.Abstractions.csproj" />
-    <ProjectReference Include="..\LLMNetHelper.Agent\LLMNetHelper.Agent.csproj" />
+    <ProjectReference Include="..\..\LLMNetHelper\LLMNetHelper.Abstractions\LLMNetHelper.Abstractions.csproj" />
+    <ProjectReference Include="..\..\LLMNetHelper\LLMNetHelper.Agent\LLMNetHelper.Agent.csproj" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(EnableSemanticKernel)' == 'true'">

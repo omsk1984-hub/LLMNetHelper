@@ -24,8 +24,8 @@
 
   <ItemGroup Condition="'$(EnableSemanticKernel)' == 'true'">
     <ProjectReference Include="..\LLMNetHelper.Orchestration.SemanticKernel\LLMNetHelper.Orchestration.SemanticKernel.csproj" />
-    <ProjectReference Include="..\LLMNetHelper.Agent\LLMNetHelper.Agent.csproj" />
-    <ProjectReference Include="..\LLMNetHelper.Abstractions\LLMNetHelper.Abstractions.csproj" />
+    <ProjectReference Include="..\..\LLMNetHelper\LLMNetHelper.Agent\LLMNetHelper.Agent.csproj" />
+    <ProjectReference Include="..\..\LLMNetHelper\LLMNetHelper.Abstractions\LLMNetHelper.Abstractions.csproj" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(EnableSemanticKernel)' == 'true'">

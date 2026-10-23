@@ -9,7 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\LLMNetHelper.Abstractions\LLMNetHelper.Abstractions.csproj" />
+    <ProjectReference Include="..\..\LLMNetHelper\LLMNetHelper.Abstractions\LLMNetHelper.Abstractions.csproj" />
   </ItemGroup>
 
   <ItemGroup>
