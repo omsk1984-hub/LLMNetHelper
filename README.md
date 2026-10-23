@@ -19,17 +19,18 @@ LLMNetHelper.Context                   — источники контекста
 LLMNetHelper.Roslyn                    — анализ кода (SolutionLoader, AST, патчи)
 LLMNetHelper.CodeChange                — git + build/test + транзакция с откатом
 LLMNetHelper.Agent                     — инструменты, оркестратор, промпты
-LLMNetHelper.Llm                       — LLM-транспорты (custom + MEAI)
+LLMNetHelper.GitLab                    — GitLab API + клонирование группы репозиториев
 LLMNetHelper.Infrastructure            — HTTP-клиенты, файловый I/O
 LLMNetHelper                           — Worker Service (хостинг + планировщик)
 LLMNetHelper.Tests                     — xUnit, офлайн
 ```
 
-**Опционально** (отключается флагом `-p:EnableSemanticKernel=false`):
+**Опционально** (отключается флагом `-p:EnableSemanticKernel=false`), в каталоге `src/LLMCore/`:
 
 ```
-LLMNetHelper.Orchestration.SemanticKernel        — SK 1.81.0 оркестратор
-LLMNetHelper.Orchestration.SemanticKernel.Tests  — паритетные тесты
+LLMCore.Llm                                — LLM-транспорты (custom + MEAI)
+LLMCore.Orchestration.SemanticKernel       — SK 1.81.0 оркестратор
+LLMCore.Orchestration.SemanticKernel.Tests — паритетные тесты
 ```
 
 Все проекты входят в решение [`src/LLMNetHelper/LLMNetHelper.slnx`](src/LLMNetHelper/LLMNetHelper.slnx:1).
@@ -157,8 +158,8 @@ pwsh -NoProfile -Command "[Console]::OutputEncoding=[Text.Encoding]::UTF8; $Outp
 
 | Провайдер | `IAnalysisLlmClient` | `IChatClient` |
 |---|---|---|
-| `custom` (по умолчанию) | [`CustomOpenAiCompatibleClient`](LLMNetHelper.Llm/CustomOpenAiCompatibleClient.cs:1) | [`CustomLlmChatClient`](LLMNetHelper.Llm/CustomLlmChatClient.cs:1) — адаптер над тем же транспортом |
-| `meai` | [`MeaiLlmClient`](LLMNetHelper.Llm/MeaiLlmClient.cs:1) | тот же транспорт с семантикой MEAI 10.5.0 |
+| `custom` (по умолчанию) | [`CustomOpenAiCompatibleClient`](src/LLMCore/LLMCore.Llm/CustomOpenAiCompatibleClient.cs:1) | [`CustomLlmChatClient`](src/LLMCore/LLMCore.Llm/CustomLlmChatClient.cs:1) — адаптер над тем же транспортом |
+| `meai` | [`MeaiLlmClient`](src/LLMCore/LLMCore.Llm/MeaiLlmClient.cs:1) | тот же транспорт с семантикой MEAI 10.5.0 |
 
 `CustomLlmChatClient` **не поддерживает tool calling на уровне протокола**:
 оркестратор получает текстовые ответы и разбирает запрос на вызов инструмента
@@ -199,11 +200,16 @@ dotnet test src/LLMNetHelper/LLMNetHelper.slnx
 dotnet test src/LLMNetHelper/LLMNetHelper.Tests/LLMNetHelper.Tests.csproj
 
 # Только паритет SK-оркестратора
-dotnet test src/LLMNetHelper/LLMNetHelper.Orchestration.SemanticKernel.Tests/LLMNetHelper.Orchestration.SemanticKernel.Tests.csproj
+dotnet test src/LLMCore/LLMCore.Orchestration.SemanticKernel.Tests/LLMCore.Orchestration.SemanticKernel.Tests.csproj
+
+# Интеграционные тесты GitLab (требуют сети и GITLAB__TOKEN)
+$env:GITLAB__INTEGRATION='1'
+dotnet test src/LLMNetHelper/LLMNetHelper.slnx --filter Category=Integration
 ```
 
-Все тесты офлайн — сеть и Docker не требуются. Актуальное количество показывает
-`dotnet test` решения; через раннер: `run_LLMNetHelper.ps1 -Test`.
+Все тесты, кроме помеченных `Category=Integration`, офлайн — сеть и Docker не
+требуются; интеграционные по умолчанию имеют статус **Skipped**. Актуальное
+количество показывает `dotnet test` решения; через раннер: `run_LLMNetHelper.ps1 -Test`.
 
 ## Коды возврата
 

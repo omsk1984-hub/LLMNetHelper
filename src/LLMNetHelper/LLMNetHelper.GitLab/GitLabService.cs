@@ -42,6 +42,36 @@ public sealed class GitLabService
     }
 
     /// <summary>
+    /// Разрешает ID группы: берёт <see cref="GitLabOptions.GroupId"/>, а если он
+    /// не задан (0) — ищет группу по <see cref="GitLabOptions.GroupName"/> через API.
+    /// </summary>
+    private async Task<int> ResolveGroupIdAsync(CancellationToken ct)
+    {
+        if (_options.GroupId > 0)
+        {
+            return _options.GroupId;
+        }
+
+        if (string.IsNullOrWhiteSpace(_options.GroupName))
+        {
+            throw new InvalidOperationException(
+                "GitLab: ни GroupId, ни GroupName не заданы — неизвестно, какую группу клонировать.");
+        }
+
+        var group = await _apiClient
+            .FindGroupByPathAsync(_options.GroupName, ct)
+            .ConfigureAwait(false);
+
+        if (group == null)
+        {
+            throw new InvalidOperationException(
+                $"Группа '{_options.GroupName}' не найдена в GitLab (проверьте GitLab:GroupName и права токена).");
+        }
+
+        return group.Id;
+    }
+
+    /// <summary>
     /// Получает список всех репозиториев группы.
     /// </summary>
     public async Task<IReadOnlyList<GitLabProject>> ListReposAsync(CancellationToken ct = default)
@@ -51,7 +81,9 @@ public sealed class GitLabService
             throw new InvalidOperationException("GitLab functionality is disabled. Set GitLab:Enabled = true.");
         }
 
-        return await _apiClient.GetGroupReposAsync(_options.GroupId, ct).ConfigureAwait(false);
+        var groupId = await ResolveGroupIdAsync(ct).ConfigureAwait(false);
+
+        return await _apiClient.GetGroupReposAsync(groupId, ct).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -66,7 +98,8 @@ public sealed class GitLabService
             throw new InvalidOperationException("GitLab functionality is disabled.");
         }
 
-        var repos = await _apiClient.GetGroupReposAsync(_options.GroupId, ct).ConfigureAwait(false);
+        var groupId = await ResolveGroupIdAsync(ct).ConfigureAwait(false);
+        var repos = await _apiClient.GetGroupReposAsync(groupId, ct).ConfigureAwait(false);
 
         if (repos.Count == 0)
         {
@@ -122,7 +155,8 @@ public sealed class GitLabService
         if (!Directory.Exists(localPath))
         {
             // Если не существует — клонируем
-            var repos = await _apiClient.GetGroupReposAsync(_options.GroupId, ct).ConfigureAwait(false);
+            var groupId = await ResolveGroupIdAsync(ct).ConfigureAwait(false);
+            var repos = await _apiClient.GetGroupReposAsync(groupId, ct).ConfigureAwait(false);
             var repo = repos.FirstOrDefault(r => r.Name == repoName);
             if (repo == null)
             {
@@ -251,7 +285,7 @@ public sealed class GitLabService
         }
     }
 
-    private static async Task<ProcessResult> RunProcessAsync(
+    private async Task<ProcessResult> RunProcessAsync(
         string fileName,
         IEnumerable<string> arguments,
         string workingDirectory,
@@ -269,6 +303,34 @@ public sealed class GitLabService
             StandardOutputEncoding = Encoding.UTF8,
             StandardErrorEncoding = Encoding.UTF8
         };
+
+        // Конфигурация git через GIT_CONFIG_* — она действует только на этот процесс
+        // и НЕ попадает в .git/config клона:
+        //   * http.extraHeader — аутентификация приватных репозиториев токеном
+        //     (иначе клон был бы анонимным и падал на 401 / запросе логина);
+        //   * core.longpaths=true — в группе есть репозитории с путями длиннее
+        //     260 символов, без этого флага checkout падает с
+        //     "File name too long".
+        var configIndex = 0;
+
+        if (!string.IsNullOrWhiteSpace(_options.Token))
+        {
+            psi.Environment[$"GIT_CONFIG_KEY_{configIndex}"] = "http.extraHeader";
+            psi.Environment[$"GIT_CONFIG_VALUE_{configIndex}"] = $"PRIVATE-TOKEN: {_options.Token}";
+            configIndex++;
+        }
+
+        if (_options.AllowLongPaths)
+        {
+            psi.Environment[$"GIT_CONFIG_KEY_{configIndex}"] = "core.longpaths";
+            psi.Environment[$"GIT_CONFIG_VALUE_{configIndex}"] = "true";
+            configIndex++;
+        }
+
+        if (configIndex > 0)
+        {
+            psi.Environment["GIT_CONFIG_COUNT"] = configIndex.ToString();
+        }
 
         foreach (var arg in arguments)
         {

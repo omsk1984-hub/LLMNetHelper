@@ -9,13 +9,15 @@
 #   pwsh -File src/LLMNetHelper/run_LLMNetHelper.ps1 -Stop               # остановить фоновый демон, запущенный этим скриптом
 #   pwsh -File src/LLMNetHelper/run_LLMNetHelper.ps1 -Check              # проверить доступность Loki и Prometheus
 #   pwsh -File src/LLMNetHelper/run_LLMNetHelper.ps1 -Test               # dotnet test по решению LLMNetHelper.slnx
+#   pwsh -File src/LLMNetHelper/run_LLMNetHelper.ps1 -CloneAll           # скачать/обновить все репозитории группы GitLab
+#   pwsh -File src/LLMNetHelper/run_LLMNetHelper.ps1 -CloneAll -ForceClone  # переклонировать заново (удалить существующие)
 #   pwsh -File src/LLMNetHelper/run_LLMNetHelper.ps1 -Info               # показать разрешённую конфигурацию
 #   pwsh -File src/LLMNetHelper/run_LLMNetHelper.ps1 -NoBuild ...        # без пересборки
 #   pwsh -File src/LLMNetHelper/run_LLMNetHelper.ps1 -NoPause ...        # не ждать клавиши (автозапуски/CI)
 #   pwsh -File src/LLMNetHelper/run_LLMNetHelper.ps1 -SkipPull ...       # не обновлять репозиторий перед прогоном
 #
 # Режимы (взаимно исключают друг друга, проверяются в этом порядке):
-#   -Test > -Check > -Info > -Stop > -Daemon > -RunNow > -DryRun (умолчание)
+#   -Test > -Check > -Info > -Stop > -CloneAll > -Daemon > -RunNow > -DryRun (умолчание)
 #
 # УМОЛЧАНИЕ — -DryRun: детерминированный сбор фактов из Loki/Prometheus и
 # snapshot-отчёт БЕЗ обращения к LLM. Это безопасно (не тратит токены, не
@@ -52,6 +54,8 @@ param(
     [switch]$Check,
     [switch]$Info,
     [switch]$Test,
+    [switch]$CloneAll,
+    [switch]$ForceClone,
 
     # --- Параметры прогона ---
     [int]$Hours = 0,
@@ -76,7 +80,8 @@ $Project     = Join-Path $ScriptDir "LLMNetHelper\LLMNetHelper.csproj"
 # Собственное решение проекта (автономно: не зависит от других репозиториев).
 $Solution    = Join-Path $ScriptDir "LLMNetHelper.slnx"
 $TestsProj   = Join-Path $ScriptDir "LLMNetHelper.Tests\LLMNetHelper.Tests.csproj"
-$SkTestsProj = Join-Path $ScriptDir "LLMNetHelper.Orchestration.SemanticKernel.Tests\LLMNetHelper.Orchestration.SemanticKernel.Tests.csproj"
+# SK-тесты живут в LLMCore (переименовано из LLMNetHelper.Orchestration.SemanticKernel.Tests)
+$SkTestsProj = Join-Path $ScriptDir "..\LLMCore\LLMCore.Orchestration.SemanticKernel.Tests\LLMCore.Orchestration.SemanticKernel.Tests.csproj"
 
 # --- Выход с ожиданием клавиши --------------------------------
 # При запуске "Выполнить с помощью PowerShell" из проводника окно создаётся
@@ -187,13 +192,27 @@ foreach ($normVar in @(
     "Context__Sources__local-folder__Path",
     "ROSLYN__SOLUTIONPATH",
     "CODECHANGE__REPOSITORYPATH",
-    "CODECHANGE__SOLUTIONPATH"
+    "CODECHANGE__SOLUTIONPATH",
+    "GITLAB__CLONEROOT"
 )) {
     $cur = [System.Environment]::GetEnvironmentVariable($normVar, "Process")
     if ($cur) {
         [System.Environment]::SetEnvironmentVariable($normVar, (Resolve-ProjectPath $cur), "Process")
     }
 }
+
+# GitLab: дефолт протокола TLS. На рабочих станциях с Windows-прокси/SChannel
+# рукопожатие TLS 1.3 может падать с Win32Exception 0x80004005 («Не удается
+# установить связь с локальной системой безопасности») — Tls12 лечит это.
+# Ставится ПОСЛЕ .env и только если значение ещё не задано, чтобы .env/окружение
+# имели приоритет.
+if (-not (Get-EnvOr "GITLAB__TLSPROTOCOLS" "")) {
+    [System.Environment]::SetEnvironmentVariable("GITLAB__TLSPROTOCOLS", "Tls12", "Process")
+}
+
+$GitLabToken     = Get-EnvOr "GITLAB__TOKEN" ""
+$GitLabCloneRoot = Get-EnvOr "GITLAB__CLONEROOT" (Join-Path $ProjectRoot "repos\GPM")
+$GitLabGroup     = Get-EnvOr "GITLAB__GROUPNAME" "GPM/backend"
 
 # Каталог логов агента — <ReportsDir>\logs. Отдельного общего LOGS_DIR
 # (Writer/Stat/Promtail) в этом репозитории нет — проект автономен.
@@ -449,6 +468,56 @@ if ($Stop) {
 
     Write-Host "[run] Процесс $procId не завершился за 15 с." -ForegroundColor Red
     Exit-WithPause 1
+}
+
+# ===============================================================
+# РЕЖИМ: -CloneAll (скачать/обновить репозитории группы GitLab)
+# ===============================================================
+if ($CloneAll -or $ForceClone) {
+    if (-not $GitLabToken) {
+        Write-Host "[clone] GITLAB__TOKEN пуст — клонирование приватных репозиториев невозможно." -ForegroundColor Red
+        Write-Host "[clone] Задайте токен в $ScriptDir\.env" -ForegroundColor DarkGray
+        Exit-WithPause 4
+    }
+
+    Invoke-Build
+
+    # Включаем GitLab-подсистему только для этого запуска (флаг = переменная окружения,
+    # которая имеет приоритет над appsettings.json). Каталог клонирования передаём
+    # нормализованным абсолютным путём — относительный путь разрешился бы от рабочего
+    # каталога процесса, а не от корня репозитория.
+    [System.Environment]::SetEnvironmentVariable("GITLAB__ENABLED", "true", "Process")
+    [System.Environment]::SetEnvironmentVariable("GITLAB__CLONEROOT", $GitLabCloneRoot, "Process")
+
+    $appArgs = @("--clone-all")
+    if ($ForceClone) { $appArgs += "--force-clone" }
+
+    Write-Host "[clone] Группа  : $GitLabGroup" -ForegroundColor Cyan
+    Write-Host "[clone] Каталог : $GitLabCloneRoot" -ForegroundColor Cyan
+    Write-Host "[clone] Режим   : $(if ($ForceClone) { 'принудительное переклонирование' } else { 'клонирование новых + обновление существующих' })" -ForegroundColor Cyan
+
+    New-Item -ItemType Directory -Force $AgentLogDir | Out-Null
+    $logFile = Join-Path $AgentLogDir ("monitor-clone.{0:yyyy-MM-dd_HH-mm-ss}.log" -f (Get-Date))
+
+    $dotnetArgs = @("run", "--project", $Project, "-c", $Configuration, "--no-build", "--") + $appArgs
+
+    $exitCode = 0
+    try {
+        & $dotnet @dotnetArgs 2>&1 | Tee-Object -FilePath $logFile
+        $exitCode = $LASTEXITCODE
+    } catch {
+        Write-Host "[clone] Ошибка запуска: $_" -ForegroundColor Red
+        $exitCode = 1
+    }
+
+    switch ($exitCode) {
+        0 { Write-Host "[clone] Готово: все репозитории синхронизированы." -ForegroundColor Green }
+        1 { Write-Host "[clone] Есть неудачные операции — см. лог $logFile" -ForegroundColor Red }
+        4 { Write-Host "[clone] Неверная конфигурация GitLab (токен/группа/права)." -ForegroundColor Red }
+        default { Write-Host "[clone] Код возврата $exitCode." -ForegroundColor Yellow }
+    }
+
+    Exit-WithPause $exitCode
 }
 
 # ===============================================================

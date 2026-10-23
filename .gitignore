@@ -28,3 +28,6 @@ logs/*
 # Отчёты ArtasTools.MemReport
 reports/
 db/backups/
+
+# Клоны репозиториев группы GitLab (скачиваются режимом -CloneAll)
+repos/

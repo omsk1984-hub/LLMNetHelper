@@ -41,4 +41,24 @@ public sealed class GitLabOptions
 
     /// <summary>Имя git-исполняемого файла.</summary>
     public string GitExecutable { get; set; } = "git";
+
+    /// <summary>
+    /// Разрешить длинные пути (> 260 символов) при checkout
+    /// (<c>core.longpaths=true</c> для процессов git). По умолчанию <c>true</c>:
+    /// в реальных группах встречаются репозитории с глубоко вложенными файлами,
+    /// без флага клон завершается с «File name too long».
+    /// </summary>
+    public bool AllowLongPaths { get; set; } = true;
+
+    /// <summary>
+    /// Допустимые протоколы TLS для GitLab API (например <c>"Tls12"</c> или
+    /// <c>"Tls12, Tls13"</c>). Пусто — системный выбор по умолчанию.
+    /// <para>
+    /// Назначение: на рабочих станциях с Windows-прокси/SChannel рукопожатие
+    /// TLS 1.3 может падать с <c>Win32Exception 0x80004005</c> («Не удается
+    /// установить связь с локальной системой безопасности») — тогда помогают
+    /// только более низкие протоколы.
+    /// </para>
+    /// </summary>
+    public string TlsProtocols { get; set; } = "";
 }

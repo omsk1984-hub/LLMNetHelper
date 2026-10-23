@@ -2,22 +2,23 @@
 
 ## Слои проектов
 
-Решение: `src/LLMNetHelper/LLMNetHelper.slnx` (12 проектов).
+Решение: `src/LLMNetHelper/LLMNetHelper.slnx` (13 проектов).
 
-| Проект | Назначение |
-|---|---|
-| `LLMNetHelper.Abstractions` | Контракты и модели. Зависимостей нет |
-| `LLMNetHelper.Core` | Сбор фактов, сводка, анализ, отчётность, хранилище |
-| `LLMNetHelper.Context` | Источники контекста: обход файлов, чанкинг, BM25-ранжирование |
-| `LLMNetHelper.Roslyn` | Анализ кода: загрузка решения, AST, поиск, граф вызовов |
-| `LLMNetHelper.CodeChange` | Git, сборка/тесты, транзакция правки с откатом |
-| `LLMNetHelper.Agent` | Инструменты, реестр, оркестраторы, промпты |
-| `LLMNetHelper.Llm` | LLM-транспорты: `custom` и `meai` |
-| `LLMNetHelper.Infrastructure` | HTTP-клиенты Loki/Prometheus, файловый вывод отчётов |
-| `LLMNetHelper` | Worker Service: хостинг, планировщик, health-эндпоинт |
-| `LLMNetHelper.Tests` | xUnit, полностью офлайн |
-| `LLMNetHelper.Orchestration.SemanticKernel` | Опциональный SK-оркестратор |
-| `LLMNetHelper.Orchestration.SemanticKernel.Tests` | Паритетные тесты SK-оркестратора |
+| Проект | Каталог | Назначение |
+|---|---|---|
+| `LLMNetHelper.Abstractions` | `src/LLMNetHelper/` | Контракты и модели. Зависимостей нет |
+| `LLMNetHelper.Core` | `src/LLMNetHelper/` | Сбор фактов, сводка, анализ, отчётность, хранилище |
+| `LLMNetHelper.Context` | `src/LLMNetHelper/` | Источники контекста: обход файлов, чанкинг, BM25-ранжирование |
+| `LLMNetHelper.Roslyn` | `src/LLMNetHelper/` | Анализ кода: загрузка решения, AST, поиск, граф вызовов |
+| `LLMNetHelper.CodeChange` | `src/LLMNetHelper/` | Git, сборка/тесты, транзакция правки с откатом |
+| `LLMNetHelper.Agent` | `src/LLMNetHelper/` | Инструменты, реестр, оркестраторы, промпты |
+| `LLMNetHelper.GitLab` | `src/LLMNetHelper/` | GitLab API, резолв группы, клонирование/обновление репозиториев |
+| `LLMNetHelper.Infrastructure` | `src/LLMNetHelper/` | HTTP-клиенты Loki/Prometheus, файловый вывод отчётов |
+| `LLMNetHelper` | `src/LLMNetHelper/` | Worker Service: хостинг, планировщик, health-эндпоинт |
+| `LLMNetHelper.Tests` | `src/LLMNetHelper/` | xUnit, полностью офлайн (кроме `Category=Integration`) |
+| `LLMCore.Llm` | `src/LLMCore/` | LLM-транспорты: `custom` и `meai` |
+| `LLMCore.Orchestration.SemanticKernel` | `src/LLMCore/` | Опциональный SK-оркестратор |
+| `LLMCore.Orchestration.SemanticKernel.Tests` | `src/LLMCore/` | Паритетные тесты SK-оркестратора |
 
 Зависимости направлены строго вниз: `Agent` → `Core`/`Context`/`Roslyn` →
 `Abstractions`. `Abstractions` не знает ни о чём.

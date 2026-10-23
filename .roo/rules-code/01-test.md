@@ -1,7 +1,7 @@
 - все тесты выполняй через `dotnet test` для решения проекта:
   - `dotnet test src/LLMNetHelper/LLMNetHelper.slnx`
   - точечно: `dotnet test src/LLMNetHelper/LLMNetHelper.Tests/LLMNetHelper.Tests.csproj`
-  - SK-паритет: `dotnet test src/LLMNetHelper/LLMNetHelper.Orchestration.SemanticKernel.Tests/LLMNetHelper.Orchestration.SemanticKernel.Tests.csproj`
+  - SK-паритет: `dotnet test src/LLMCore/LLMCore.Orchestration.SemanticKernel.Tests/LLMCore.Orchestration.SemanticKernel.Tests.csproj`
   - либо через раннер: `run_LLMNetHelper.ps1 -Test`
 - все тесты офлайн: сеть и Docker для их прохода не требуются
 - исключения с сетью помечены трейтом `Category=Integration` и по умолчанию

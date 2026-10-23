@@ -6,9 +6,9 @@
   <Project Path="LLMNetHelper.Core/LLMNetHelper.Core.csproj" />
   <Project Path="LLMNetHelper.GitLab/LLMNetHelper.GitLab.csproj" />
   <Project Path="LLMNetHelper.Infrastructure/LLMNetHelper.Infrastructure.csproj" />
-  <Project Path="LLMNetHelper.Llm/LLMNetHelper.Llm.csproj" />
-  <Project Path="LLMNetHelper.Orchestration.SemanticKernel.Tests/LLMNetHelper.Orchestration.SemanticKernel.Tests.csproj" />
-  <Project Path="LLMNetHelper.Orchestration.SemanticKernel/LLMNetHelper.Orchestration.SemanticKernel.csproj" />
+  <Project Path="../LLMCore/LLMCore.Llm/LLMCore.Llm.csproj" />
+  <Project Path="../LLMCore/LLMCore.Orchestration.SemanticKernel.Tests/LLMCore.Orchestration.SemanticKernel.Tests.csproj" />
+  <Project Path="../LLMCore/LLMCore.Orchestration.SemanticKernel/LLMCore.Orchestration.SemanticKernel.csproj" />
   <Project Path="LLMNetHelper.Roslyn/LLMNetHelper.Roslyn.csproj" />
   <Project Path="LLMNetHelper.Tests/LLMNetHelper.Tests.csproj" />
   <Project Path="LLMNetHelper/LLMNetHelper.csproj" />

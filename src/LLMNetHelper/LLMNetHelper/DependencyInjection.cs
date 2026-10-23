@@ -12,7 +12,7 @@ using LLMNetHelper.Infrastructure.Context;
 using LLMNetHelper.Infrastructure.Loki;
 using LLMNetHelper.Infrastructure.Prometheus;
 using LLMNetHelper.Infrastructure.Reporting;
-using LLMNetHelper.Llm;
+using LLMCore.Llm;
 using LLMNetHelper.Roslyn;
 using LLMNetHelper.Running;
 using LLMNetHelper.Scheduling;

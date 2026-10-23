@@ -97,17 +97,24 @@ public sealed class FailurePointAnalyzer
 
             if (!hasLogging)
             {
+                // Тип один — "catch-without-log" — как объявлено в контракте
+                // IFailurePointAnalyzer. Различие «широкий catch (Exception)/голый
+                // catch» против «узкий catch конкретного типа» сохраняется в
+                // описании, а не в отдельном типе: иначе появлялся бы четвёртый
+                // тип ("catch-exception"), отсутствующий в контракте.
                 var isBroad = catchClause.Declaration is null ||
                               catchClause.Declaration.Type.ToString() == "Exception";
+
+                var description = isBroad
+                    ? $"catch ({catchClause.Declaration?.Type.ToString() ?? ""}) без логирования"
+                    : "catch конкретного исключения без логирования";
 
                 results.Add(new FailurePoint(
                     filePath,
                     line,
-                    isBroad ? "catch-exception" : "catch-without-log",
+                    "catch-without-log",
                     member,
-                    isBroad
-                        ? $"catch ({catchClause.Declaration?.Type}) без логирования"
-                        : "catch конкретного исключения без логирования"));
+                    description));
             }
         }
 
