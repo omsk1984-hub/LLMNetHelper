@@ -35,12 +35,23 @@ public sealed class SolutionLoader : IDisposable
     }
 
     /// <summary>
-    /// Загружает решение (или проект) и возвращает <see cref="Solution"/>.
-    /// Возвращает <c>null</c>, если анализ недоступен или загрузка не удалась.
+    /// Загружает решение по пути из <see cref="RoslynOptions.SolutionPath"/>.
     /// </summary>
-    public async Task<Solution?> LoadAsync(CancellationToken ct = default)
+    public Task<Solution?> LoadAsync(CancellationToken ct = default)
     {
-        if (!_options.Enabled || string.IsNullOrWhiteSpace(_options.SolutionPath))
+        return LoadAsync(_options.SolutionPath, ct);
+    }
+
+    /// <summary>
+    /// Загружает решение (или проект) по явному пути и возвращает <see cref="Solution"/>.
+    /// Возвращает <c>null</c>, если анализ недоступен, путь пуст/не существует
+    /// или загрузка не удалась. Кэш ключуется по абсолютному пути, поэтому
+    /// разные решения (например, разные репозитории чата в режиме <c>/repo</c>)
+    /// сосуществуют в кэше и вытесняются по TTL <see cref="RoslynOptions.CompilationCacheSeconds"/>.
+    /// </summary>
+    public async Task<Solution?> LoadAsync(string solutionPath, CancellationToken ct = default)
+    {
+        if (!_options.Enabled || string.IsNullOrWhiteSpace(solutionPath))
         {
             return null;
         }
@@ -50,7 +61,16 @@ public sealed class SolutionLoader : IDisposable
             return null;
         }
 
-        var path = Path.GetFullPath(_options.SolutionPath);
+        string path;
+        try
+        {
+            path = Path.GetFullPath(solutionPath);
+        }
+        catch (ArgumentException)
+        {
+            return null;
+        }
+
         if (!File.Exists(path))
         {
             return null;

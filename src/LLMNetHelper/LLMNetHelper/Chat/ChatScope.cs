@@ -2,6 +2,7 @@ using LLMNetHelper.Abstractions;
 using LLMNetHelper.Context;
 using LLMNetHelper.GitLab;
 using LLMNetHelper.Infrastructure.Context;
+using LLMNetHelper.Roslyn;
 
 namespace LLMNetHelper.Chat;
 
@@ -21,6 +22,7 @@ public sealed class ChatScope
 {
     private readonly ChatOptions _options;
     private string? _currentRepo;
+    private ResolutionResult? _solutionCache;
 
     public ChatScope(GitLabOptions gitLab, ChatOptions options)
     {
@@ -73,6 +75,7 @@ public sealed class ChatScope
         if (string.IsNullOrWhiteSpace(name))
         {
             _currentRepo = null;
+            _solutionCache = null;
             message = $"Область: все репозитории ({CloneRoot}).";
             return true;
         }
@@ -85,12 +88,41 @@ public sealed class ChatScope
         }
 
         _currentRepo = name.Trim();
+        _solutionCache = null;
         message = $"Область: {_currentRepo} ({candidate}).";
         return true;
     }
 
     /// <summary>Сброс области на все репозитории CloneRoot.</summary>
-    public void Reset() => _currentRepo = null;
+    public void Reset()
+    {
+        _currentRepo = null;
+        _solutionCache = null;
+    }
+
+    /// <summary>
+    /// Файл решения текущего репозитория (<c>*.slnx</c> → <c>*.sln</c> → единственный
+    /// <c>*.csproj</c>, глубина ≤ 2). <c>false</c> — область не сужена до репозитория
+    /// (Roslyn в чате работает только с <c>/repo</c>) или решение не найдено.
+    /// Результат кэшируется до смены области.
+    /// </summary>
+    public bool TryGetSolutionPath(out string solutionPath)
+    {
+        solutionPath = "";
+        if (_currentRepo is null)
+        {
+            return false;
+        }
+
+        _solutionCache ??= SolutionResolver.Resolve(RootPath);
+        if (!_solutionCache.Found)
+        {
+            return false;
+        }
+
+        solutionPath = _solutionCache.SolutionPath;
+        return true;
+    }
 
     /// <summary>
     /// BM25-поиск по файлам текущей области (переиспользует

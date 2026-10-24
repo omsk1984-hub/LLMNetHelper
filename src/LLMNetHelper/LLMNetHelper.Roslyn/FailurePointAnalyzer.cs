@@ -56,14 +56,61 @@ public sealed class FailurePointAnalyzer
 
     /// <summary>
     /// Находит проблемные места с фильтрацией по пути файла.
+    /// Заглушка для основного прогона (CodeSearchTool): решение недоступно
+    /// без <see cref="SolutionLoader"/> — вызывающий должен использовать
+    /// перегрузку с <see cref="Solution"/> или <see cref="IEnumerable{SourceDocument}"/>.
     /// </summary>
-    public async Task<IReadOnlyList<FailurePoint>> AnalyzeAsync(
+    public Task<IReadOnlyList<FailurePoint>> AnalyzeAsync(
         string? fileFilter = null,
         CancellationToken ct = default)
     {
-        // Этот метод оставлен для обратной совместимости с CodeSearchTool.
-        // Возвращает пустой список, так как для полноценной работы нужен SolutionLoader.
-        return [];
+        return Task.FromResult<IReadOnlyList<FailurePoint>>([]);
+    }
+
+    /// <summary>
+    /// Находит проблемные места в загруженном решении (режим чата <c>/repo</c>).
+    /// </summary>
+    public async Task<IReadOnlyList<FailurePoint>> AnalyzeAsync(
+        Solution solution,
+        string? fileFilter = null,
+        CancellationToken ct = default)
+    {
+        var results = new List<FailurePoint>();
+
+        foreach (var project in solution.Projects)
+        {
+            foreach (var document in project.Documents)
+            {
+                ct.ThrowIfCancellationRequested();
+
+                if (document.FilePath is null)
+                {
+                    continue;
+                }
+
+                if (!string.IsNullOrWhiteSpace(fileFilter) &&
+                    !document.FilePath.Contains(fileFilter, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                var root = await document.GetSyntaxRootAsync(ct).ConfigureAwait(false);
+                if (root is null)
+                {
+                    continue;
+                }
+
+                AnalyzeRoot(root, document.FilePath, results);
+            }
+        }
+
+        results.Sort(static (a, b) =>
+        {
+            var byFile = string.CompareOrdinal(a.FileName, b.FileName);
+            return byFile != 0 ? byFile : a.Line.CompareTo(b.Line);
+        });
+
+        return results;
     }
 
     /// <summary>

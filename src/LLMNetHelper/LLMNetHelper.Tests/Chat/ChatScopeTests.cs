@@ -209,4 +209,53 @@ public class ChatScopeTests : IDisposable
 
         Assert.Equal(2, files.Count);
     }
+
+    [Fact]
+    public void TryGetSolutionPath_AllRepos_False()
+    {
+        Write("alpha/Alpha.sln", "");
+        var scope = CreateScope();
+
+        Assert.False(scope.TryGetSolutionPath(out var path));
+        Assert.Equal("", path);
+    }
+
+    [Fact]
+    public void TryGetSolutionPath_RepoWithSolution_True()
+    {
+        Write("alpha/Alpha.slnx", "");
+        var scope = CreateScope();
+        scope.TrySetRepo("alpha", out _);
+
+        Assert.True(scope.TryGetSolutionPath(out var path));
+        Assert.EndsWith("Alpha.slnx", path, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void TryGetSolutionPath_RepoWithoutSolution_False()
+    {
+        Write("alpha/README.md", "# alpha");
+        var scope = CreateScope();
+        scope.TrySetRepo("alpha", out _);
+
+        Assert.False(scope.TryGetSolutionPath(out _));
+    }
+
+    [Fact]
+    public void TryGetSolutionPath_SwitchRepo_InvalidatesCache()
+    {
+        Write("alpha/Alpha.sln", "");
+        // beta — без решения.
+        Write("beta/README.md", "# beta");
+
+        var scope = CreateScope();
+        scope.TrySetRepo("alpha", out _);
+        Assert.True(scope.TryGetSolutionPath(out _));
+
+        scope.TrySetRepo("beta", out _);
+        Assert.False(scope.TryGetSolutionPath(out _));
+
+        scope.Reset();
+        Assert.False(scope.TryGetSolutionPath(out _));
+    }
 }

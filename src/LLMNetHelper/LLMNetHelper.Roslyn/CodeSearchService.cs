@@ -21,9 +21,22 @@ public sealed class CodeSearchService
 
     /// <summary>
     /// Ищет типы и члены, чьё имя содержит подстроку (без учёта регистра).
+    /// Решение — из <see cref="RoslynOptions.SolutionPath"/>.
+    /// </summary>
+    public Task<IReadOnlyList<CodeSymbol>> SearchAsync(
+        string query,
+        CancellationToken ct = default)
+    {
+        return SearchAsync(query, solutionPath: null, ct);
+    }
+
+    /// <summary>
+    /// Поиск в решении по явному пути (режим чата <c>/repo</c>).
+    /// <paramref name="solutionPath"/> = null — глобальный путь из опций.
     /// </summary>
     public async Task<IReadOnlyList<CodeSymbol>> SearchAsync(
         string query,
+        string? solutionPath,
         CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(query))
@@ -31,12 +44,22 @@ public sealed class CodeSearchService
             return [];
         }
 
-        var solution = await _loader.LoadAsync(ct).ConfigureAwait(false);
+        var solution = solutionPath is null
+            ? await _loader.LoadAsync(ct).ConfigureAwait(false)
+            : await _loader.LoadAsync(solutionPath, ct).ConfigureAwait(false);
         if (solution is null)
         {
             return [];
         }
 
+        return await SearchInSolutionAsync(query, solution, ct).ConfigureAwait(false);
+    }
+
+    private async Task<IReadOnlyList<CodeSymbol>> SearchInSolutionAsync(
+        string query,
+        Solution solution,
+        CancellationToken ct)
+    {
         var results = new List<CodeSymbol>();
 
         foreach (var project in solution.Projects)

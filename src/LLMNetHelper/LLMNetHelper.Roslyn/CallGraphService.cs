@@ -21,10 +21,22 @@ public sealed class CallGraphService
     }
 
     /// <summary>
-    /// Кто вызывает метод с указанным именем.
+    /// Кто вызывает метод с указанным именем (решение из глобального пути).
+    /// </summary>
+    public Task<IReadOnlyList<CodeSymbol>> FindCallersAsync(
+        string methodName,
+        CancellationToken ct = default)
+    {
+        return FindCallersAsync(methodName, solutionPath: null, ct);
+    }
+
+    /// <summary>
+    /// Callers в решении по явному пути (режим чата <c>/repo</c>).
+    /// <paramref name="solutionPath"/> = null — глобальный путь из опций.
     /// </summary>
     public async Task<IReadOnlyList<CodeSymbol>> FindCallersAsync(
         string methodName,
+        string? solutionPath,
         CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(methodName))
@@ -32,12 +44,22 @@ public sealed class CallGraphService
             return [];
         }
 
-        var solution = await _loader.LoadAsync(ct).ConfigureAwait(false);
+        var solution = solutionPath is null
+            ? await _loader.LoadAsync(ct).ConfigureAwait(false)
+            : await _loader.LoadAsync(solutionPath, ct).ConfigureAwait(false);
         if (solution is null)
         {
             return [];
         }
 
+        return await FindCallersInSolutionAsync(methodName, solution, ct).ConfigureAwait(false);
+    }
+
+    private async Task<IReadOnlyList<CodeSymbol>> FindCallersInSolutionAsync(
+        string methodName,
+        Solution solution,
+        CancellationToken ct)
+    {
         var results = new List<CodeSymbol>();
 
         foreach (var project in solution.Projects)
@@ -84,10 +106,22 @@ public sealed class CallGraphService
     }
 
     /// <summary>
-    /// Какие методы вызывает указанный метод.
+    /// Какие методы вызывает указанный метод (решение из глобального пути).
+    /// </summary>
+    public Task<IReadOnlyList<string>> FindCalleesAsync(
+        string methodName,
+        CancellationToken ct = default)
+    {
+        return FindCalleesAsync(methodName, solutionPath: null, ct);
+    }
+
+    /// <summary>
+    /// Callees в решении по явному пути (режим чата <c>/repo</c>).
+    /// <paramref name="solutionPath"/> = null — глобальный путь из опций.
     /// </summary>
     public async Task<IReadOnlyList<string>> FindCalleesAsync(
         string methodName,
+        string? solutionPath,
         CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(methodName))
@@ -95,12 +129,22 @@ public sealed class CallGraphService
             return [];
         }
 
-        var solution = await _loader.LoadAsync(ct).ConfigureAwait(false);
+        var solution = solutionPath is null
+            ? await _loader.LoadAsync(ct).ConfigureAwait(false)
+            : await _loader.LoadAsync(solutionPath, ct).ConfigureAwait(false);
         if (solution is null)
         {
             return [];
         }
 
+        return await FindCalleesInSolutionAsync(methodName, solution, ct).ConfigureAwait(false);
+    }
+
+    private async Task<IReadOnlyList<string>> FindCalleesInSolutionAsync(
+        string methodName,
+        Solution solution,
+        CancellationToken ct)
+    {
         var callees = new SortedSet<string>(StringComparer.Ordinal);
 
         foreach (var project in solution.Projects)

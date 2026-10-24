@@ -32,7 +32,7 @@ UTF-8-префикс обязателен: консоль стартует в CP
 | `-Chat` | Интерактивный чат с ИИ по скачанным репозиториям (`GitLab:CloneRoot`); требует `LLM__ENDPOINT`/`LLM__APIKEY`, токен GitLab не нужен |
 | `-Chat -Ask "вопрос"` | Один вопрос и выход (для скриптов/CI) |
 | `-Chat -Repo <имя>` | Начать чат, сузив поиск до одного репозитория `CloneRoot/<имя>` |
-| `-Chat -Tools` | Начать чат в агентском режиме (ReAct + инструменты `repo_search`/`repo_read_file`/`repo_list_files`) |
+| `-Chat -Tools` | Начать чат в агентском режиме (ReAct + инструменты `repo_search`/`repo_read_file`/`repo_list_files`; после `/repo <имя>` и с `-Roslyn` добавляются `repo_failure_points`/`repo_call_graph`/`repo_symbol_search`) |
 | `-Info` | Показать разрешённую конфигурацию (пути, порты, существование каталогов) |
 | `-NoBuild` | Не пересобирать перед запуском |
 | `-Roslyn` / `-CodeChange` | Включить соответствующие подсистемы только для этого запуска (переопределяют `.env`) |
@@ -135,6 +135,13 @@ pwsh -NoProfile -Command "[Console]::OutputEncoding=[Text.Encoding]::UTF8; $Outp
   модели с цитированием путей. В режиме `/tools` модель сама вызывает
   `repo_search` / `repo_read_file` / `repo_list_files` (белый список,
   guard путей внутри CloneRoot, секреты режутся `Redactor`).
+- Roslyn-анализ в чате (план 21): при `-Chat -Tools -Roslyn` и выбранном
+  `/repo <имя>` к белому списку добавляются `repo_failure_points`
+  (пустые/нелогирующие catch, throw null), `repo_call_graph` (область влияния
+  правки) и `repo_symbol_search` (точные координаты объявлений). Работают
+  только для выбранного репозитория: файл решения ищется в его каталоге
+  (`*.slnx` → `*.sln` → единственный `*.csproj`). Требуют полный MSBuild SDK
+  на хосте; в Docker — недоступны. Доступность показывает `/status`.
 - **Hosted-сервисы стартуют всегда** (наблюдаемость): health-эндпоинт
   `http://localhost:<Agent:HealthPort>/health` доступен всё время чата,
   ночной планировщик работает. Поэтому порт health не должен быть занят

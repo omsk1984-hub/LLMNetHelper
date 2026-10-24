@@ -192,6 +192,11 @@ internal static class Program
         try
         {
             var scope = new ChatScope(gitLabOptions, chatOptions);
+
+            // Roslyn-слой для режима /tools: регистрируется всегда, но
+            // инструменты появляются только при Roslyn:Enabled=true и /repo
+            // (plan 21). Разрешение — через GetService (nullable), чтобы чат
+            // не падал, если слой не зарегистрирован.
             var session = new ChatSession(
                 host.Services.GetRequiredService<Microsoft.Extensions.AI.IChatClient>(),
                 scope,
@@ -199,7 +204,17 @@ internal static class Program
                 llmOptions,
                 host.Services.GetRequiredService<ILoggerFactory>(),
                 Console.In,
-                Console.Out);
+                Console.Out,
+                host.Services.GetService<LLMNetHelper.Roslyn.SolutionLoader>(),
+                host.Services.GetService<LLMNetHelper.Roslyn.CodeSearchService>(),
+                host.Services.GetService<LLMNetHelper.Roslyn.CallGraphService>(),
+                host.Services.GetService<LLMNetHelper.Roslyn.FailurePointAnalyzer>(),
+                host.Services.GetService<LLMNetHelper.Roslyn.RoslynOptions>());
+
+            if (tools)
+            {
+                Console.WriteLine($"[INFO] Roslyn-инструменты: {(session.RoslynAvailable ? "доступны (после /repo)" : "недоступны")}");
+            }
 
             return await session.RunAsync(ask, repo, tools, CancellationToken.None);
         }

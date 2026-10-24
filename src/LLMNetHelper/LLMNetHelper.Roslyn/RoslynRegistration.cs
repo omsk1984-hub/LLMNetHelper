@@ -23,6 +23,7 @@ public static class RoslynRegistration
         services.AddSingleton<CodeReader>();
         services.AddSingleton<CallGraphService>();
         services.AddSingleton<StructureAnalyzer>();
+        services.AddSingleton<FailurePointAnalyzer>();
         return services;
     }
 }

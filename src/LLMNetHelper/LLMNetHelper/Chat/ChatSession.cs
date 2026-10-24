@@ -1,7 +1,9 @@
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
+using LLMNetHelper.Abstractions;
 using LLMNetHelper.Agent.Tools;
 using LLMNetHelper.Chat.Tools;
+using LLMNetHelper.Roslyn;
 using LLMCore.Abstractions;
 
 namespace LLMNetHelper.Chat;
@@ -13,6 +15,9 @@ namespace LLMNetHelper.Chat;
 /// <see cref="ChatScope"/> → один ответ <see cref="IChatClient"/>.
 /// Режим B (<c>/tools</c>): агентский ReAct-цикл (<see cref="ChatAgentLoop"/>)
 /// с инструментами <c>repo_search</c> / <c>repo_read_file</c> / <c>repo_list_files</c>.
+/// После <c>/repo <имя></c> и при <c>Roslyn:Enabled=true</c> к ним добавляются
+/// Roslyn-инструменты <c>repo_failure_points</c> / <c>repo_call_graph</c> /
+/// <c>repo_symbol_search</c> (реестр перестраивается на каждый вопрос).
 /// </para>
 /// <para>
 /// Неинтерактивный прогон: <c>--ask="…"</c> — один вопрос и выход.
@@ -30,6 +35,13 @@ public sealed class ChatSession
     private readonly TextReader _in;
     private readonly TextWriter _out;
 
+    // Roslyn-слой (опционален: null => инструменты не регистрируются).
+    private readonly SolutionLoader? _solutionLoader;
+    private readonly CodeSearchService? _codeSearch;
+    private readonly CallGraphService? _callGraph;
+    private readonly FailurePointAnalyzer? _failureAnalyzer;
+    private readonly RoslynOptions? _roslynOptions;
+
     private readonly List<ChatMessage> _history = [];
     private bool _toolsMode;
     private IChatTranscript _transcript = NullChatTranscript.Instance;
@@ -41,7 +53,12 @@ public sealed class ChatSession
         LlmOptions llmOptions,
         ILoggerFactory loggerFactory,
         TextReader @in,
-        TextWriter @out)
+        TextWriter @out,
+        SolutionLoader? solutionLoader = null,
+        CodeSearchService? codeSearch = null,
+        CallGraphService? callGraph = null,
+        FailurePointAnalyzer? failureAnalyzer = null,
+        RoslynOptions? roslynOptions = null)
     {
         _chat = chat;
         _scope = scope;
@@ -50,7 +67,24 @@ public sealed class ChatSession
         _loggerFactory = loggerFactory;
         _in = @in;
         _out = @out;
+        _solutionLoader = solutionLoader;
+        _codeSearch = codeSearch;
+        _callGraph = callGraph;
+        _failureAnalyzer = failureAnalyzer;
+        _roslynOptions = roslynOptions;
     }
+
+    /// <summary>
+    /// Roslyn-инструменты доступны: слой включён, все зависимости переданы
+    /// и текущая область — конкретный репозиторий с файлом решения.
+    /// </summary>
+    public bool RoslynAvailable =>
+        _roslynOptions is { Enabled: true }
+        && _solutionLoader is not null
+        && _codeSearch is not null
+        && _callGraph is not null
+        && _failureAnalyzer is not null
+        && _scope.TryGetSolutionPath(out _);
 
     /// <summary>Текущий режим /tools (для тестов и диагностики).</summary>
     public bool ToolsMode => _toolsMode;
@@ -270,11 +304,29 @@ public sealed class ChatSession
         return messages;
     }
 
-    private ToolRegistry BuildToolRegistry() => new([
-        new RepoSearchTool(_scope),
-        new RepoReadFileTool(_scope, _options),
-        new RepoListFilesTool(_scope, _options)
-    ]);
+    /// <summary>
+    /// Реестр инструментов: базовая тройка <c>repo_*</c> всегда; Roslyn-тройка —
+    /// только при <c>Roslyn:Enabled</c>, выбранным <c>/repo</c> и найденном
+    /// файле решения (plan 21, требование «только /repo»).
+    /// </summary>
+    private ToolRegistry BuildToolRegistry()
+    {
+        var tools = new List<IAgentTool>
+        {
+            new RepoSearchTool(_scope),
+            new RepoReadFileTool(_scope, _options),
+            new RepoListFilesTool(_scope, _options)
+        };
+
+        if (RoslynAvailable)
+        {
+            tools.Add(new RepoFailurePointsTool(_scope, _solutionLoader!, _failureAnalyzer!));
+            tools.Add(new RepoCallGraphTool(_scope, _callGraph!));
+            tools.Add(new RepoSymbolSearchTool(_scope, _codeSearch!));
+        }
+
+        return new ToolRegistry(tools);
+    }
 
     private void AppendHistory(string question, string answer)
     {
@@ -343,5 +395,23 @@ public sealed class ChatSession
         _out.WriteLine($"[chat] Модель  : {_llmOptions.Model}");
         _out.WriteLine($"[chat] Режим   : {(_toolsMode ? "/tools (ReAct)" : "поиск контекста (BM25)")}");
         _out.WriteLine($"[chat] История: {_history.Count} сообщений (лимит {_options.HistoryMessages})");
+        _out.WriteLine($"[chat] Roslyn  : {DescribeRoslyn()}");
+    }
+
+    private string DescribeRoslyn()
+    {
+        if (_roslynOptions is null || !_roslynOptions.Enabled)
+        {
+            return "выключен (Roslyn:Enabled=false)";
+        }
+
+        if (_scope.CurrentRepo is null)
+        {
+            return "готов, требуется /repo <имя> (анализ только для одного репозитория)";
+        }
+
+        return RoslynAvailable
+            ? "включён: repo_failure_points / repo_call_graph / repo_symbol_search"
+            : "включён, но решение не найдено в " + _scope.RootPath;
     }
 }
