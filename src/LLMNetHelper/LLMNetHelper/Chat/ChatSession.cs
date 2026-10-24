@@ -231,7 +231,16 @@ public sealed class ChatSession
             var response = await _chat.GetResponseAsync(messagesA, cancellationToken: ct).ConfigureAwait(false);
             var text = response.Text ?? "[пустой ответ]";
 
-            _transcript.LogAssistantAnswer(text);
+            // Usage из ответа транспорта (может отсутствовать — null).
+            int? inputTokens = null;
+            int? outputTokens = null;
+            if (response.Usage is { } usage)
+            {
+                inputTokens = usage.InputTokenCount is { } i ? (int)Math.Min(i, int.MaxValue) : null;
+                outputTokens = usage.OutputTokenCount is { } o ? (int)Math.Min(o, int.MaxValue) : null;
+            }
+
+            _transcript.LogAssistantAnswer(text, inputTokens, outputTokens);
             AppendHistory(question, text);
             return text;
         }

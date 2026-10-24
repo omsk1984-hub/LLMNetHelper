@@ -59,11 +59,22 @@ public sealed class ChatAgentLoop
             ct.ThrowIfCancellationRequested();
 
             string? responseText;
+            int? inputTokens = null;
+            int? outputTokens = null;
 
             try
             {
                 var response = await _chat.GetResponseAsync(messages, cancellationToken: ct).ConfigureAwait(false);
                 responseText = response.Text;
+
+                // Usage из ответа транспорта (OpenAI-совместимый usage.prompt_tokens/
+                // completion_tokens): CustomLlmChatClient заполняет UsageDetails.
+                // Может отсутствовать (null) — провайдер не вернул токены.
+                if (response.Usage is { } usage)
+                {
+                    inputTokens = usage.InputTokenCount is { } i ? (int)Math.Min(i, int.MaxValue) : null;
+                    outputTokens = usage.OutputTokenCount is { } o ? (int)Math.Min(o, int.MaxValue) : null;
+                }
             }
             catch (OperationCanceledException)
             {
@@ -85,19 +96,19 @@ public sealed class ChatAgentLoop
             if (!TryParseToolCall(responseText, out var toolName, out var toolArgs))
             {
                 // Финальный ответ текстом.
-                _transcript.LogAssistantAnswer(responseText);
+                _transcript.LogAssistantAnswer(responseText, inputTokens, outputTokens);
                 return responseText;
             }
 
             if (toolCalls >= _options.ToolCallLimit)
             {
                 _logger.LogWarning("Чат: достигнут лимит вызовов инструментов ({Limit})", _options.ToolCallLimit);
-                _transcript.LogModelStep(step, responseText);
+                _transcript.LogModelStep(step, responseText, inputTokens, outputTokens);
                 _transcript.LogNote("[Достигнут лимит вызовов инструментов — ответ может быть неполным.]");
                 return responseText + "\n\n[Достигнут лимит вызовов инструментов — ответ может быть неполным.]";
             }
 
-            _transcript.LogModelStep(step, responseText);
+            _transcript.LogModelStep(step, responseText, inputTokens, outputTokens);
             _transcript.LogToolCall(step, toolName, toolArgs);
 
             var (resultText, succeeded) = await InvokeToolAsync(toolName, toolArgs, ct).ConfigureAwait(false);

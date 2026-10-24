@@ -22,8 +22,12 @@ public interface IChatTranscript
     /// <summary>Служебная команда (<c>/repo</c>, <c>/tools</c>, <c>/clear</c>, …).</summary>
     void LogCommand(string commandLine);
 
-    /// <summary>Сырой ответ модели, распознанный как запрос инструмента.</summary>
-    void LogModelStep(int step, string rawResponseText);
+    /// <summary>
+    /// Сырой ответ модели, распознанный как запрос инструмента.
+    /// <paramref name="inputTokens"/>/<paramref name="outputTokens"/> — usage из
+    /// ответа транспорта (может отсутствовать: <c>null</c>).
+    /// </summary>
+    void LogModelStep(int step, string rawResponseText, int? inputTokens = null, int? outputTokens = null);
 
     /// <summary>Вызов инструмента: имя + аргументы (JSON).</summary>
     void LogToolCall(int step, string toolName, string argumentsJson);
@@ -32,7 +36,7 @@ public interface IChatTranscript
     void LogToolResult(int step, string toolName, string resultText, bool succeeded);
 
     /// <summary>Финальный ответ ассистента (текст пользователю).</summary>
-    void LogAssistantAnswer(string text);
+    void LogAssistantAnswer(string text, int? inputTokens = null, int? outputTokens = null);
 
     /// <summary>Заметка: лимиты, сбои, смена области/режима, прочее.</summary>
     void LogNote(string text);
@@ -56,10 +60,10 @@ public sealed class NullChatTranscript : IChatTranscript
 
     public void LogUserMessage(string text) { }
     public void LogCommand(string commandLine) { }
-    public void LogModelStep(int step, string rawResponseText) { }
+    public void LogModelStep(int step, string rawResponseText, int? inputTokens = null, int? outputTokens = null) { }
     public void LogToolCall(int step, string toolName, string argumentsJson) { }
     public void LogToolResult(int step, string toolName, string resultText, bool succeeded) { }
-    public void LogAssistantAnswer(string text) { }
+    public void LogAssistantAnswer(string text, int? inputTokens = null, int? outputTokens = null) { }
     public void LogNote(string text) { }
     public void LogContextDocuments(IReadOnlyList<ContextDocument> documents) { }
 }
@@ -87,6 +91,9 @@ public sealed class ChatDialogLogger : IChatTranscript, IDisposable
     private int _toolCalls;
     private bool _inQuestion;
     private readonly bool _includeContextFragments;
+    private long _inputTokens;
+    private long _outputTokens;
+    private bool _hasUsage;
 
     /// <summary>Полный путь созданного файла транскрипта.</summary>
     public string FilePath { get; }
@@ -202,12 +209,13 @@ public sealed class ChatDialogLogger : IChatTranscript, IDisposable
     }
 
     /// <inheritdoc />
-    public void LogModelStep(int step, string rawResponseText)
+    public void LogModelStep(int step, string rawResponseText, int? inputTokens = null, int? outputTokens = null)
     {
         lock (_sync)
         {
             OpenQuestionIfNeeded();
-            WriteLine($"### Шаг {step + 1} — ответ модели (запрос инструмента) — {Stamp()}");
+            WriteLine($"### Шаг {step + 1} — ответ модели (запрос инструмента) — {Stamp()}{UsageSuffix(inputTokens, outputTokens)}");
+            AccumulateUsage(inputTokens, outputTokens);
             WriteLine();
             WriteFenced(rawResponseText, "json");
             WriteLine();
@@ -241,12 +249,13 @@ public sealed class ChatDialogLogger : IChatTranscript, IDisposable
     }
 
     /// <inheritdoc />
-    public void LogAssistantAnswer(string text)
+    public void LogAssistantAnswer(string text, int? inputTokens = null, int? outputTokens = null)
     {
         lock (_sync)
         {
             OpenQuestionIfNeeded();
-            WriteLine($"### Финальный ответ — {Stamp()}");
+            WriteLine($"### Финальный ответ — {Stamp()}{UsageSuffix(inputTokens, outputTokens)}");
+            AccumulateUsage(inputTokens, outputTokens);
             WriteLine();
             WriteLine(text);
             WriteLine();
@@ -274,7 +283,15 @@ public sealed class ChatDialogLogger : IChatTranscript, IDisposable
         lock (_sync)
         {
             OpenQuestionIfNeeded();
-            WriteLine($"### Контекст (BM25): {documents.Count} фрагментов — {Stamp()}");
+            // Суммарный объём отправленного модели контекста (символов):
+            // виден сразу в заголовке секции, без подсчёта по фрагментам.
+            var totalChars = 0;
+            foreach (var doc in documents)
+            {
+                totalChars += doc.Length;
+            }
+
+            WriteLine($"### Контекст (BM25): {documents.Count} фрагментов, всего {totalChars} симв. — {Stamp()}");
             WriteLine();
             if (documents.Count == 0)
             {
@@ -324,6 +341,11 @@ public sealed class ChatDialogLogger : IChatTranscript, IDisposable
                 WriteLine($"## Завершено: {DateTimeOffset.UtcNow:HH:mm:ss} UTC");
                 WriteLine();
                 WriteLine($"Вопросов/команд: {_questionNo}, вызовов инструментов: {_toolCalls}.");
+                if (_hasUsage)
+                {
+                    WriteLine(
+                        $"Токены за сеанс: вход {_inputTokens}, выход {_outputTokens}, всего {_inputTokens + _outputTokens}.");
+                }
             }
             catch (IOException ex)
             {
@@ -383,6 +405,32 @@ public sealed class ChatDialogLogger : IChatTranscript, IDisposable
     }
 
     private string Stamp() => DateTime.UtcNow.ToString("HH:mm:ss") + " UTC";
+
+    /// <summary>
+    /// Суффикс заголовка секции с usage ответа модели; пустая строка, если
+    /// транспорт токены не вернул.
+    /// </summary>
+    private static string UsageSuffix(int? inputTokens, int? outputTokens)
+    {
+        if (inputTokens is null && outputTokens is null)
+        {
+            return "";
+        }
+
+        return $" · токены: вход {inputTokens?.ToString() ?? "?"}, выход {outputTokens?.ToString() ?? "?"}";
+    }
+
+    private void AccumulateUsage(int? inputTokens, int? outputTokens)
+    {
+        if (inputTokens is null && outputTokens is null)
+        {
+            return;
+        }
+
+        _hasUsage = true;
+        _inputTokens += inputTokens ?? 0;
+        _outputTokens += outputTokens ?? 0;
+    }
 
     private void WriteLine(string text = "")
     {

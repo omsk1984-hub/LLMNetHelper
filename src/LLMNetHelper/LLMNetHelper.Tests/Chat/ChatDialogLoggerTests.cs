@@ -181,7 +181,8 @@ public sealed class ChatDialogLoggerTests : IDisposable
         var transcript = (ChatDialogLogger)ChatDialogLogger.TryCreate(Options(), Header());
         var docs = new List<ContextDocument>
         {
-            new("local-folder", "demo/README.md", "demo/README.md", "полное содержимое фрагмента", 12.34)
+            new("local-folder", "demo/README.md", "demo/README.md", "полное содержимое фрагмента", 12.34),
+            new("local-folder", "demo/src/Writer.cs", "demo/src/Writer.cs", "Writer", 9.87)
         };
 
         transcript.LogUserMessage("вопрос");
@@ -191,6 +192,8 @@ public sealed class ChatDialogLoggerTests : IDisposable
 
         var text = File.ReadAllText(transcript.FilePath);
 
+        // Заголовок секции: число фрагментов + суммарный объём отправленного контекста.
+        Assert.Contains("### Контекст (BM25): 2 фрагментов, всего 33 симв. — ", text, StringComparison.Ordinal);
         Assert.Contains("- `demo/README.md` (score 12.34, 27 симв.) — `demo/README.md`", text, StringComparison.Ordinal);
         // По умолчанию IncludeContextFragments=true: полный текст фрагмента
         // пишется в блоке ```text (ровно то, что видела модель).
@@ -251,6 +254,43 @@ public sealed class ChatDialogLoggerTests : IDisposable
     }
 
     [Fact]
+    public void UsageTokens_SectionSuffix_AndSessionFooter()
+    {
+        var transcript = (ChatDialogLogger)ChatDialogLogger.TryCreate(Options(), Header());
+
+        transcript.LogUserMessage("вопрос");
+        transcript.LogModelStep(0, "{\"tool\":\"repo_search\"}", inputTokens: 100, outputTokens: 20);
+        transcript.LogToolCall(0, "repo_search", "{}");
+        transcript.LogToolResult(0, "repo_search", "ок", succeeded: true);
+        transcript.LogAssistantAnswer("ответ", inputTokens: 150, outputTokens: 40);
+        transcript.Dispose();
+
+        var text = File.ReadAllText(transcript.FilePath);
+
+        // Суффикс usage в заголовках секций ответа модели.
+        Assert.Contains("ответ модели (запрос инструмента) — ", text, StringComparison.Ordinal);
+        Assert.Contains("· токены: вход 100, выход 20", text, StringComparison.Ordinal);
+        Assert.Contains("· токены: вход 150, выход 40", text, StringComparison.Ordinal);
+        // Итог по сеансу в футере.
+        Assert.Contains("Токены за сеанс: вход 250, выход 60, всего 310.", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void UsageTokens_Absent_NoFooterLine()
+    {
+        var transcript = (ChatDialogLogger)ChatDialogLogger.TryCreate(Options(), Header());
+
+        transcript.LogUserMessage("вопрос");
+        transcript.LogAssistantAnswer("ответ");
+        transcript.Dispose();
+
+        var text = File.ReadAllText(transcript.FilePath);
+
+        Assert.DoesNotContain("токены:", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("Токены за сеанс:", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Utf8_CyrillicRoundTrip()
     {
         var transcript = (ChatDialogLogger)ChatDialogLogger.TryCreate(Options(), Header());
@@ -276,18 +316,25 @@ public sealed class ChatDialogLoggerTests : IDisposable
 
         public void LogUserMessage(string text) => Events.Add($"user:{text}");
         public void LogCommand(string commandLine) => Events.Add($"cmd:{commandLine}");
-        public void LogModelStep(int step, string raw) => Events.Add($"model:{step}:{raw}");
+        public void LogModelStep(int step, string raw, int? inputTokens = null, int? outputTokens = null) =>
+            Events.Add($"model:{step}:{raw}:{inputTokens}/{outputTokens}");
         public void LogToolCall(int step, string tool, string args) => Events.Add($"call:{step}:{tool}:{args}");
         public void LogToolResult(int step, string tool, string result, bool ok) => Events.Add($"result:{step}:{tool}:{(ok ? "ok" : "fail")}:{result}");
-        public void LogAssistantAnswer(string text) => Events.Add($"answer:{text}");
+        public void LogAssistantAnswer(string text, int? inputTokens = null, int? outputTokens = null) =>
+            Events.Add($"answer:{text}:{inputTokens}/{outputTokens}");
         public void LogNote(string text) => Events.Add($"note:{text}");
         public void LogContextDocuments(IReadOnlyList<ContextDocument> documents) => Events.Add($"ctx:{documents.Count}");
     }
 
-    /// <summary>Фейковый клиент: очередь ответов (паттерн ChatAgentLoopTests).</summary>
+    /// <summary>
+    /// Фейковый клиент: очередь ответов (паттерн ChatAgentLoopTests);
+    /// <paramref name="usage"/> — одинаковый usage на каждый ответ (или null).
+    /// </summary>
     private sealed class ScriptedChatClient(params string[] responses) : IChatClient
     {
         private readonly Queue<string> _responses = new(responses);
+
+        public UsageDetails? Usage { get; init; }
 
         public Task<ChatResponse> GetResponseAsync(
             IEnumerable<ChatMessage> messages,
@@ -295,7 +342,10 @@ public sealed class ChatDialogLoggerTests : IDisposable
             CancellationToken cancellationToken = default)
         {
             var text = _responses.Count > 0 ? _responses.Dequeue() : "";
-            return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, text)));
+            return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, text))
+            {
+                Usage = Usage
+            });
         }
 
         public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
@@ -338,11 +388,54 @@ public sealed class ChatDialogLoggerTests : IDisposable
 
         Assert.Equal("Итоговый ответ.", answer);
         Assert.Contains("user:Где App?", transcript.Events);
-        Assert.Contains("model:0:{\"tool\":\"repo_search\",\"arguments\":{\"query\":\"App\"}}", transcript.Events);
+        // Без usage суффикс токенов — пустой ("/").
+        Assert.Contains("model:0:{\"tool\":\"repo_search\",\"arguments\":{\"query\":\"App\"}}:/", transcript.Events);
         Assert.Contains("call:0:repo_search:{\"query\":\"App\"}", transcript.Events);
         // Полный текст результата инструмента (не число символов).
         Assert.Contains("result:0:repo_search:ok:Найдено: 1 фрагмент", transcript.Events);
-        Assert.Contains("answer:Итоговый ответ.", transcript.Events);
+        Assert.Contains("answer:Итоговый ответ.:/", transcript.Events);
+    }
+
+    [Fact]
+    public async Task AgentLoop_UsageTokens_PropagatedToTranscript()
+    {
+        var chat = new ScriptedChatClient(
+            """{"tool":"repo_search","arguments":{"query":"App"}}""",
+            "Итоговый ответ.")
+        {
+            Usage = new UsageDetails { InputTokenCount = 120, OutputTokenCount = 30 }
+        };
+        var transcript = new RecordingTranscript();
+        var loop = new ChatAgentLoop(
+            chat,
+            new LLMNetHelper.Agent.Tools.ToolRegistry([new FixedTool("repo_search", "ок")]),
+            new ChatOpts(),
+            NullLogger<ChatAgentLoop>.Instance,
+            transcript);
+
+        await loop.RunAsync([], "Где App?", CancellationToken.None);
+
+        // Шаг с вызовом инструмента и финальный ответ несут usage своего запроса.
+        Assert.Contains("model:0:{\"tool\":\"repo_search\",\"arguments\":{\"query\":\"App\"}}:120/30", transcript.Events);
+        Assert.Contains("answer:Итоговый ответ.:120/30", transcript.Events);
+    }
+
+    [Fact]
+    public async Task AgentLoop_NoUsageTokens_TranscriptGetsNulls()
+    {
+        var chat = new ScriptedChatClient("Финал.");
+        var transcript = new RecordingTranscript();
+        var loop = new ChatAgentLoop(
+            chat,
+            new LLMNetHelper.Agent.Tools.ToolRegistry([]),
+            new ChatOpts(),
+            NullLogger<ChatAgentLoop>.Instance,
+            transcript);
+
+        await loop.RunAsync([], "вопрос", CancellationToken.None);
+
+        // Usage нет -> суффикс "/": оба токена null.
+        Assert.Contains("answer:Финал.:/", transcript.Events);
     }
 
     [Fact]
