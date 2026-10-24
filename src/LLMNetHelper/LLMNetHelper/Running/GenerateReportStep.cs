@@ -50,7 +50,7 @@ public sealed class GenerateReportStep : IRunStep
         };
 
         var agentReport = new AgentReport(
-            Orchestrator: context.Diagnosis.Orchestrator,
+            Orchestrator: context.Diagnosis!.Orchestrator,
             Hypotheses: context.Diagnosis.Hypotheses,
             ContextDocuments: context.ContextResult?.Documents ?? [],
             UnavailableSources: context.ContextResult?.UnavailableSources ?? [],

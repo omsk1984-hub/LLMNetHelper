@@ -28,9 +28,12 @@ public sealed class CollectContextStep : IRunStep
 
     public async Task ExecuteAsync(RunContext context, CancellationToken ct)
     {
+        // ВАЖНО: проверка через `?.Count == 0` не ловила случай null-фактов
+        // (null == 0 -> false), и последующее разыменование падало с NRE
+        // (это же подсвечивал варнинг CS8602). Поэтому null-ветки явные.
         if (_options.Enabled is false ||
-            context.LokiFacts?.ErrorSamples.Count == 0 ||
-            context.PrometheusFacts?.MetricFacts.Count == 0)
+            context.LokiFacts is null || context.LokiFacts.ErrorSamples.Count == 0 ||
+            context.PrometheusFacts is null || context.PrometheusFacts.MetricFacts.Count == 0)
         {
             _logger.LogInformation("Контекст не запрачивается: нет ошибок и аномальных метрик");
             context.ContextResult = new ContextSearchResult([], [], []);

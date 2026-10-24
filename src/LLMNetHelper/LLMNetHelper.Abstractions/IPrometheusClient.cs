@@ -13,10 +13,10 @@ public interface IPrometheusClient : IDisposable
         string query, DateTime from, DateTime to, TimeSpan step, CancellationToken ct = default);
 
     /// <summary>Получение списка правил алертинга.</summary>
-    Task<List<Dictionary<string, object>>> GetAlertingRulesAsync(CancellationToken ct = default);
+    Task<List<Dictionary<string, object?>>> GetAlertingRulesAsync(CancellationToken ct = default);
 
     /// <summary>Получение firing alerts.</summary>
-    Task<List<Dictionary<string, object>>> GetAlertsAsync(CancellationToken ct = default);
+    Task<List<Dictionary<string, object?>>> GetAlertsAsync(CancellationToken ct = default);
 
     /// <summary>Получение метрик Prometheus для health-check.</summary>
     Task<string?> GetMetricsAsync(CancellationToken ct = default);

@@ -18,6 +18,12 @@
     <PackageReference Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" Version="4.14.0" />
     <PackageReference Include="Microsoft.Build.Locator" Version="1.7.8" />
     <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.0" />
+    <!-- Унификация версии System.CodeDom: транзитивная ветка
+         Microsoft.Build.Tasks.Core 17.14.28 требует System.CodeDom >= 9.0.0,
+         а ветка через Microsoft.Build.Locator тянет 7.0.0 -> MSB3277
+         (конфликт версий сборок). Прямая ссылка 9.0.0 разрешает конфликт.
+         Пакет используется только build-time и не попадает в рантайм агента. -->
+    <PackageReference Include="System.CodeDom" Version="9.0.0" />
   </ItemGroup>
 
 </Project>

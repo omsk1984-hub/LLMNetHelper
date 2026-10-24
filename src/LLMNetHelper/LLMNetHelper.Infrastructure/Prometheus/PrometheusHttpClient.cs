@@ -162,7 +162,7 @@ public sealed class PrometheusHttpClient : IPrometheusClient
         _ => element.ToString()
     };
 
-    public async Task<List<Dictionary<string, object>>> GetAlertingRulesAsync(CancellationToken ct = default)
+    public async Task<List<Dictionary<string, object?>>> GetAlertingRulesAsync(CancellationToken ct = default)
     {
         try
         {
@@ -172,7 +172,7 @@ public sealed class PrometheusHttpClient : IPrometheusClient
             var json = await response.Content.ReadAsStringAsync(ct);
             var doc = JsonDocument.Parse(json);
 
-            var rules = new List<Dictionary<string, object>>();
+            var rules = new List<Dictionary<string, object?>>();
             var root = doc.RootElement;
 
             if (root.TryGetProperty("data", out var data) &&
@@ -184,7 +184,7 @@ public sealed class PrometheusHttpClient : IPrometheusClient
                     {
                         foreach (var rule in rulesArr.EnumerateArray())
                         {
-                            var dict = new Dictionary<string, object>();
+                            var dict = new Dictionary<string, object?>();
                             foreach (var prop in rule.EnumerateObject())
                             {
                                 dict[prop.Name] = CloneValue(prop.Value);
@@ -199,11 +199,11 @@ public sealed class PrometheusHttpClient : IPrometheusClient
         catch (Exception ex)
         {
             Console.Error.WriteLine($"[PROM] Rules query error: {ex.Message}");
-            return new List<Dictionary<string, object>>();
+            return new List<Dictionary<string, object?>>();
         }
     }
 
-    public async Task<List<Dictionary<string, object>>> GetAlertsAsync(CancellationToken ct = default)
+    public async Task<List<Dictionary<string, object?>>> GetAlertsAsync(CancellationToken ct = default)
     {
         try
         {
@@ -213,14 +213,14 @@ public sealed class PrometheusHttpClient : IPrometheusClient
             var json = await response.Content.ReadAsStringAsync(ct);
             var doc = JsonDocument.Parse(json);
 
-            var alerts = new List<Dictionary<string, object>>();
+            var alerts = new List<Dictionary<string, object?>>();
             var root = doc.RootElement;
 
             if (root.TryGetProperty("data", out var data) && data.TryGetArray(out var array))
             {
                 foreach (var alert in array)
                 {
-                    var dict = new Dictionary<string, object>();
+                    var dict = new Dictionary<string, object?>();
                     foreach (var prop in alert.EnumerateObject())
                     {
                         dict[prop.Name] = CloneValue(prop.Value);
@@ -233,7 +233,7 @@ public sealed class PrometheusHttpClient : IPrometheusClient
         catch (Exception ex)
         {
             Console.Error.WriteLine($"[PROM] Alerts query error: {ex.Message}");
-            return new List<Dictionary<string, object>>();
+            return new List<Dictionary<string, object?>>();
         }
     }
 
@@ -252,7 +252,8 @@ public sealed class PrometheusHttpClient : IPrometheusClient
         }
     }
 
-    private static object CloneValue(JsonElement elem)
+    // JSON-null допустим в ответах Prometheus -> значение может быть null (CS8603).
+    private static object? CloneValue(JsonElement elem)
     {
         return elem.ValueKind switch
         {
