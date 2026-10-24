@@ -17,13 +17,12 @@
     <PackageReference Include="System.Memory.Data" Version="10.0.3" />
     <!-- Microsoft.Extensions.AI.OpenAI удалён: транспорт собственный
          (CustomOpenAiCompatibleClient), OpenAI-SDK-адаптер не используется. -->
-    <!-- Microsoft.Extensions.Options и Microsoft.Extensions.Configuration.Binder
-         удалены: доступны автоматически через FrameworkReference Microsoft.AspNetCore.App
-         (устраняет NU1510). -->
-  </ItemGroup>
-
-  <ItemGroup>
-    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <!-- FrameworkReference Microsoft.AspNetCore.App заменён точечными пакетами:
+         библиотека ядра не должна зависеть от shared framework ASP.NET Core.
+         Все версии 10.0.0 присутствуют в офлайн-кэше (план 15, §2). -->
+    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.0" />
   </ItemGroup>
 
 </Project>

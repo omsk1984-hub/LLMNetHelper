@@ -80,16 +80,15 @@ flowchart TB
    говорит «13 проектов», таблица LLM-транспортов описывает `MeaiLlmClient`
    как реализацию провайдера `meai`, что не соответствует коду.
 
-### 1.5 Отмечено, но НЕ выполняется (офлайн-окружение)
+### 1.5 Отмечено, но НЕ выполнялось в этом плане
 
-- `FrameworkReference Microsoft.AspNetCore.App` в
-  [`LLMCore.Llm.csproj`](../src/LLMCore/LLMCore.Llm/LLMCore.Llm.csproj:25) —
-  тяжёлая ссылка ради Options/Http/Binder. Замена на точечные пакеты
-  рискованна: офлайн-кэш NuGet может не содержать нужных версий
-  (исторически здесь же гасили NU1510). Оставляем как есть.
-- Пакет `Microsoft.Extensions.AI.OpenAI` в `LLMCore.Llm` — проверка
-  использования и снятие только если сборка подтвердит неиспользование
-  (шаг 4, опционально).
+- ~~`FrameworkReference Microsoft.AspNetCore.App` в `LLMCore.Llm.csproj`~~ —
+  **выполнено отдельно планом 15**
+  ([`plans/15_llmcore-llm-frameworkreference-removal.md`](15_llmcore-llm-frameworkreference-removal.md)):
+  заменён точечными пакетами `Microsoft.Extensions.Http` /
+  `Configuration.Binder` / `DependencyInjection` (10.0.0, офлайн-кэш проверен).
+- Пакет `Microsoft.Extensions.AI.OpenAI` в `LLMCore.Llm` — **выполнено**
+  (шаг 4): снят как неиспользуемый.
 
 ---
 
