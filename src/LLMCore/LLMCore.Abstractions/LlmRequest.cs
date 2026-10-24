@@ -1,4 +1,4 @@
-namespace LLMNetHelper.Abstractions;
+namespace LLMCore.Abstractions;
 
 /// <summary>
 /// Запрос к LLM: системный промпт, пользовательский промпт (сводка), схема JSON, параметры генерации.

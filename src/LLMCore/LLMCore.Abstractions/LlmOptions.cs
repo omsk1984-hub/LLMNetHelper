@@ -1,4 +1,4 @@
-namespace LLMNetHelper.Abstractions;
+namespace LLMCore.Abstractions;
 
 /// <summary>
 /// Параметры LLM: провайдер, endpoint, модель, ключ, лимиты.

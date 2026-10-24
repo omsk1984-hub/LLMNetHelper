@@ -1,3 +1,4 @@
+using LLMNetHelper.Scheduling;
 using Xunit;
 
 namespace LLMNetHelper.Tests.Scheduling;
@@ -60,15 +61,15 @@ public class NightlyScheduleTests
         Assert.Equal(DateTimeKind.Utc, next.Kind);
     }
 
-    // Вспомогательный метод (копируем логику из NightlyScheduleHostedService)
-    private static DateTime CalculateNextRun(TimeSpan runTime, DateTime nowUtc)
+    [Fact]
+    public void ParseRunTime_HappyPath()
     {
-        var next = new DateTime(nowUtc.Year, nowUtc.Month, nowUtc.Day,
-            runTime.Hours, runTime.Minutes, 0, DateTimeKind.Utc);
-
-        if (next <= nowUtc)
-            next = next.AddDays(1);
-
-        return next;
+        Assert.Equal(new TimeSpan(3, 0, 0), NightlyScheduleHostedService.ParseRunTime("03:00"));
+        Assert.Equal(new TimeSpan(23, 59, 0), NightlyScheduleHostedService.ParseRunTime("23:59"));
     }
+
+    // Логику не дублируем: тестируем реальный метод планировщика
+    // (internal + InternalsVisibleTo в LLMNetHelper.csproj).
+    private static DateTime CalculateNextRun(TimeSpan runTime, DateTime nowUtc)
+        => NightlyScheduleHostedService.CalculateNextRun(runTime, nowUtc);
 }

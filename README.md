@@ -13,7 +13,7 @@
 ## Архитектура
 
 ```
-LLMNetHelper.Abstractions              — контракты, без зависимостей
+LLMNetHelper.Abstractions              — контракты домена, без зависимостей
 LLMNetHelper.Core                      — сборка фактов, сводка, отчётность
 LLMNetHelper.Context                   — источники контекста (FileWalker, BM25)
 LLMNetHelper.Roslyn                    — анализ кода (SolutionLoader, AST, патчи)
@@ -25,10 +25,11 @@ LLMNetHelper                           — Worker Service (хостинг + пл
 LLMNetHelper.Tests                     — xUnit, офлайн
 ```
 
-**Опционально** (отключается флагом `-p:EnableSemanticKernel=false`), в каталоге `src/LLMCore/`:
+**Ядро LLM** (в каталоге `src/LLMCore/`; SK-часть отключается флагом `-p:EnableSemanticKernel=false`):
 
 ```
-LLMCore.Llm                                — LLM-транспорты (custom + MEAI)
+LLMCore.Abstractions                       — общие LLM-контракты (IAnalysisLlmClient, LlmRequest/LlmCompletion, LlmOptions)
+LLMCore.Llm                                — LLM-транспорт (собственный OpenAI-совместимый + адаптер MEAI)
 LLMCore.Orchestration.SemanticKernel       — SK 1.81.0 оркестратор
 LLMCore.Orchestration.SemanticKernel.Tests — паритетные тесты
 ```
@@ -159,7 +160,10 @@ pwsh -NoProfile -Command "[Console]::OutputEncoding=[Text.Encoding]::UTF8; $Outp
 | Провайдер | `IAnalysisLlmClient` | `IChatClient` |
 |---|---|---|
 | `custom` (по умолчанию) | [`CustomOpenAiCompatibleClient`](src/LLMCore/LLMCore.Llm/CustomOpenAiCompatibleClient.cs:1) | [`CustomLlmChatClient`](src/LLMCore/LLMCore.Llm/CustomLlmChatClient.cs:1) — адаптер над тем же транспортом |
-| `meai` | [`MeaiLlmClient`](src/LLMCore/LLMCore.Llm/MeaiLlmClient.cs:1) | тот же транспорт с семантикой MEAI 10.5.0 |
+| `meai` | алиас `custom` — та же пара классов | та же пара классов |
+
+Контракты живут в [`LLMCore.Abstractions`](src/LLMCore/LLMCore.Abstractions/IAnalysisLlmClient.cs:1):
+ядро LLM не зависит от продукта (`LLMNetHelper.*`).
 
 `CustomLlmChatClient` **не поддерживает tool calling на уровне протокола**:
 оркестратор получает текстовые ответы и разбирает запрос на вызов инструмента

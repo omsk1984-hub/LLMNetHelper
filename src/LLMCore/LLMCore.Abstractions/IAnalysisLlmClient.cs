@@ -1,8 +1,8 @@
-namespace LLMNetHelper.Abstractions;
+namespace LLMCore.Abstractions;
 
 /// <summary>
 /// Контракт клиента LLM для генерации отчётов.
-/// Две реализации: CustomOpenAiCompatibleClient и MeaiLlmClient.
+/// Реализация: <c>CustomOpenAiCompatibleClient</c> (LLMCore.Llm).
 /// </summary>
 public interface IAnalysisLlmClient
 {

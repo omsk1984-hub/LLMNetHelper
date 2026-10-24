@@ -76,7 +76,7 @@ Health-порт должен быть свободен. `HttpListener` на `htt
 
 | Параметр | Env | Дефолт | Описание |
 |---|---|---|---|
-| `Provider` | `LLM__PROVIDER` | `custom` | `custom` (свой HttpClient) или `meai` (Microsoft.Extensions.AI 10.5.0) |
+| `Provider` | `LLM__PROVIDER` | `custom` | `custom` (свой HttpClient) или `meai` (алиас `custom`: единый транспорт, см. `docs/architecture.md`) |
 | `Endpoint` | `LLM__ENDPOINT` | — | Корень OpenAI-совместимого API; клиент сам постит на `/v1/chat/completions` |
 | `ApiKey` | `LLM__APIKEY` | пусто | СЕКРЕТ — только в `.env`. Пусто → заголовок Authorization не добавляется, `-RunNow` упадёт на 401 |
 | `Model` | `LLM__MODEL` | `gpt-4.1-mini` | Модель |

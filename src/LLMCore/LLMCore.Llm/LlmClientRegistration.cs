@@ -1,5 +1,5 @@
 using System.Net.Http.Headers;
-using LLMNetHelper.Abstractions;
+using LLMCore.Abstractions;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -10,16 +10,17 @@ namespace LLMCore.Llm;
 /// <summary>
 /// Регистрация LLM-клиентов в DI.
 /// <para>
-/// Выбор реализации зависит от <see cref="LlmOptions.Provider"/>:
-/// <list type="bullet">
-///   <item><c>custom</c> — свой HttpClient с полным контролем над JSON-схемой;</item>
-///   <item><c>meai</c> — Microsoft.Extensions.AI 10.5.0 через SDK-провайдер.</item>
-/// </list>
+/// Транспорт один — собственный HttpClient с полным контролем над JSON-схемой
+/// (<see cref="CustomOpenAiCompatibleClient"/>). Провайдер <c>meai</c>
+/// исторически означал отдельный транспорт, но в текущей реализации
+/// является алиасом <c>custom</c>: конфигурация принимается без изменений
+/// поведения.
 /// </para>
 /// <para>
 /// Для агентского оркестратора дополнительно регистрируется
-/// <see cref="IChatClient"/>. При <c>custom</c> это тонкая обёртка над тем же
-/// транспортом (см. <see cref="CustomLlmChatClient"/>).
+/// <see cref="IChatClient"/> — тонкая обёртка над тем же транспортом
+/// (см. <see cref="CustomLlmChatClient"/>), поэтому оркестратор
+/// работает без второго HTTP-клиента.
 /// </para>
 /// </summary>
 public static class LlmClientRegistration
@@ -39,58 +40,34 @@ public static class LlmClientRegistration
 
         var llmOptions = configuration.GetSection("Llm").Get<LlmOptions>() ?? new LlmOptions();
 
-        RegisterNamedHttpClient(services, llmOptions);
-
         var provider = (llmOptions.Provider ?? "custom").Trim().ToLowerInvariant();
 
-        switch (provider)
+        // meai — алиас custom: единый транспорт, единая регистрация.
+        if (provider != "custom" && provider != "meai")
         {
-            case "custom":
-                services.AddSingleton<IAnalysisLlmClient>(sp =>
-                {
-                    var options = sp.GetRequiredService<IOptions<LlmOptions>>();
-                    return new CustomOpenAiCompatibleClient(
-                        sp.GetRequiredService<IHttpClientFactory>(),
-                        options);
-                });
-
-                // IChatClient поверх того же транспорта — чтобы оркестратор
-                // работал и на custom-провайдере.
-                services.AddSingleton<IChatClient>(sp =>
-                {
-                    var options = sp.GetRequiredService<IOptions<LlmOptions>>();
-                    return new CustomLlmChatClient(
-                        sp.GetRequiredService<IAnalysisLlmClient>(),
-                        options);
-                });
-                break;
-
-            case "meai":
-                // Транспорт MEAI строится поверх того же [OI]-совместимого
-                // HTTP-клиента, что и custom: MeaiLlmClient реализует IChatClient,
-                // а низкоуровневый SDK-транспорт подключается отдельно
-                // (см. README, раздел «Провайдер meai»).
-                services.AddSingleton<IAnalysisLlmClient>(sp =>
-                {
-                    var options = sp.GetRequiredService<IOptions<LlmOptions>>();
-                    return new CustomOpenAiCompatibleClient(
-                        sp.GetRequiredService<IHttpClientFactory>(),
-                        options);
-                });
-
-                services.AddSingleton<IChatClient>(sp =>
-                {
-                    var options = sp.GetRequiredService<IOptions<LlmOptions>>();
-                    return new CustomLlmChatClient(
-                        sp.GetRequiredService<IAnalysisLlmClient>(),
-                        options);
-                });
-                break;
-
-            default:
-                throw new InvalidOperationException(
-                    $"Неизвестный LLM-провайдер: '{llmOptions.Provider}'. Допустимо: custom, meai.");
+            throw new InvalidOperationException(
+                $"Неизвестный LLM-провайдер: '{llmOptions.Provider}'. Допустимо: custom, meai.");
         }
+
+        RegisterNamedHttpClient(services, llmOptions);
+
+        services.AddSingleton<IAnalysisLlmClient>(sp =>
+        {
+            var options = sp.GetRequiredService<IOptions<LlmOptions>>();
+            return new CustomOpenAiCompatibleClient(
+                sp.GetRequiredService<IHttpClientFactory>(),
+                options);
+        });
+
+        // IChatClient поверх того же транспорта — чтобы оркестратор
+        // работал и на custom-провайдере.
+        services.AddSingleton<IChatClient>(sp =>
+        {
+            var options = sp.GetRequiredService<IOptions<LlmOptions>>();
+            return new CustomLlmChatClient(
+                sp.GetRequiredService<IAnalysisLlmClient>(),
+                options);
+        });
 
         return services;
     }

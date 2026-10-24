@@ -10,6 +10,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Тесты планировщика вызывают internal-методы расчёта расписания
+         (CalculateNextRun, ParseRunTime) напрямую, чтобы не дублировать логику. -->
+    <InternalsVisibleTo Include="LLMNetHelper.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\LLMNetHelper.Abstractions\LLMNetHelper.Abstractions.csproj" />
     <ProjectReference Include="..\LLMNetHelper.Core\LLMNetHelper.Core.csproj" />
     <ProjectReference Include="..\..\LLMCore\LLMCore.Llm\LLMCore.Llm.csproj" />

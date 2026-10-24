@@ -12,6 +12,7 @@ using LLMNetHelper.Infrastructure.Context;
 using LLMNetHelper.Infrastructure.Loki;
 using LLMNetHelper.Infrastructure.Prometheus;
 using LLMNetHelper.Infrastructure.Reporting;
+using LLMCore.Abstractions;
 using LLMCore.Llm;
 using LLMNetHelper.Roslyn;
 using LLMNetHelper.Running;
@@ -70,7 +71,6 @@ public static class DependencyInjection
         // --- Ядро: сводка и отчётность ---
         services.AddSingleton<ISnapshotBudgetEnforcer, TokenBudgetGuard>();
         services.AddSingleton<SnapshotBuilder>();
-        services.AddSingleton<IFactCollectorFactory, FactCollectorFactory>();
         services.AddSingleton<IReportWriter>(sp =>
         {
             var options = sp.GetRequiredService<IOptions<AgentOptions>>().Value;

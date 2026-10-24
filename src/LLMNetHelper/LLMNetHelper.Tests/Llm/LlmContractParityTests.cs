@@ -1,3 +1,4 @@
+using LLMCore.Abstractions;
 using LLMNetHelper.Core.Analysis;
 
 namespace LLMNetHelper.Tests.Llm;
@@ -10,7 +11,7 @@ public class LlmContractParityTests
     [Fact]
     public void LlmCompletion_HasAllProperties()
     {
-        var completion = new Abstractions.LlmCompletion(
+        var completion = new LlmCompletion(
             Text: "test",
             Json: "{\"verdict\":\"OK\"}",
             PromptTokens: 100,
@@ -33,7 +34,7 @@ public class LlmContractParityTests
     [Fact]
     public void LlmRequest_Immutability()
     {
-        var request = new Abstractions.LlmRequest(
+        var request = new LlmRequest(
             SystemPrompt: "sys",
             UserPrompt: "user",
             ExpectedJsonSchema: "{}",

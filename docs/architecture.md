@@ -2,11 +2,12 @@
 
 ## Слои проектов
 
-Решение: `src/LLMNetHelper/LLMNetHelper.slnx` (13 проектов).
+Решение: `src/LLMNetHelper/LLMNetHelper.slnx` (14 проектов).
 
 | Проект | Каталог | Назначение |
 |---|---|---|
-| `LLMNetHelper.Abstractions` | `src/LLMNetHelper/` | Контракты и модели. Зависимостей нет |
+| `LLMCore.Abstractions` | `src/LLMCore/` | Общие LLM-контракты ядра (`IAnalysisLlmClient`, `LlmRequest`/`LlmCompletion`, `LlmOptions`). Зависимостей нет |
+| `LLMNetHelper.Abstractions` | `src/LLMNetHelper/` | Контракты и модели домена мониторинга. Зависимостей нет |
 | `LLMNetHelper.Core` | `src/LLMNetHelper/` | Сбор фактов, сводка, анализ, отчётность, хранилище |
 | `LLMNetHelper.Context` | `src/LLMNetHelper/` | Источники контекста: обход файлов, чанкинг, BM25-ранжирование |
 | `LLMNetHelper.Roslyn` | `src/LLMNetHelper/` | Анализ кода: загрузка решения, AST, поиск, граф вызовов |
@@ -16,12 +17,14 @@
 | `LLMNetHelper.Infrastructure` | `src/LLMNetHelper/` | HTTP-клиенты Loki/Prometheus, файловый вывод отчётов |
 | `LLMNetHelper` | `src/LLMNetHelper/` | Worker Service: хостинг, планировщик, health-эндпоинт |
 | `LLMNetHelper.Tests` | `src/LLMNetHelper/` | xUnit, полностью офлайн (кроме `Category=Integration`) |
-| `LLMCore.Llm` | `src/LLMCore/` | LLM-транспорты: `custom` и `meai` |
+| `LLMCore.Llm` | `src/LLMCore/` | LLM-транспорт: собственный OpenAI-совместимый клиент + адаптер MEAI |
 | `LLMCore.Orchestration.SemanticKernel` | `src/LLMCore/` | Опциональный SK-оркестратор |
 | `LLMCore.Orchestration.SemanticKernel.Tests` | `src/LLMCore/` | Паритетные тесты SK-оркестратора |
 
 Зависимости направлены строго вниз: `Agent` → `Core`/`Context`/`Roslyn` →
-`Abstractions`. `Abstractions` не знает ни о чём.
+`Abstractions`; `LLMCore.Llm` → `LLMCore.Abstractions`. Оба `Abstractions`
+не знают ни о чём: ядро и продукт разделены контрактами, обратных ссылок
+(`LLMCore.*` → `LLMNetHelper.*` в части LLM-контрактов) нет.
 
 ## Поток выполнения прогона
 
@@ -82,7 +85,11 @@ Markdown + JSON + patch.diff в Agent:ReportsDir
 | Провайдер | `IAnalysisLlmClient` | `IChatClient` |
 |---|---|---|
 | `custom` (по умолчанию) | `CustomOpenAiCompatibleClient` | `CustomLlmChatClient` (адаптер над тем же транспортом) |
-| `meai` | `MeaiLlmClient` | тот же транспорт MEAI 10.5.0 |
+| `meai` | алиас `custom`: та же пара классов | та же пара классов |
+
+Исторически `meai` означал отдельный транспорт (`MeaiLlmClient`), удалённый
+как неиспользуемый: конфигурационное значение `meai` принимается без
+изменения поведения.
 
 `CustomLlmChatClient` **не поддерживает tool calling на уровне протокола**:
 оркестратор получает текстовые ответы и разбирает запрос на вызов инструмента

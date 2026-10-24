@@ -1,6 +1,6 @@
 using System.Runtime.CompilerServices;
 using System.Text;
-using LLMNetHelper.Abstractions;
+using LLMCore.Abstractions;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Options;
 

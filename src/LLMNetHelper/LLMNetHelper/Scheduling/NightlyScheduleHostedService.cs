@@ -147,13 +147,13 @@ public sealed class NightlyScheduleHostedService : BackgroundService
         }
     }
 
-    private static TimeSpan ParseRunTime(string runAt)
+    internal static TimeSpan ParseRunTime(string runAt)
     {
         var parts = runAt.Split(':');
         return new TimeSpan(int.Parse(parts[0]), int.Parse(parts[1]), 0);
     }
 
-    private static DateTime CalculateNextRun(TimeSpan runTime, DateTime nowUtc)
+    internal static DateTime CalculateNextRun(TimeSpan runTime, DateTime nowUtc)
     {
         var next = new DateTime(nowUtc.Year, nowUtc.Month, nowUtc.Day,
             runTime.Hours, runTime.Minutes, 0, DateTimeKind.Utc);

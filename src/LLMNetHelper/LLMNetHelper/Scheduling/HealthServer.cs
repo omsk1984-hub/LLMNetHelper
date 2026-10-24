@@ -4,6 +4,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
+namespace LLMNetHelper.Scheduling;
+
 /// <summary>
 /// Фоновый сервис для healthcheck-эндпоинтов.
 /// Заменяет inline-код HTTP-сервера из <c>Program.cs</c>.

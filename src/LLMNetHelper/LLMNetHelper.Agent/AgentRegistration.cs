@@ -1,7 +1,6 @@
 using LLMNetHelper.Abstractions;
 using LLMNetHelper.Agent.Orchestration;
 using LLMNetHelper.Agent.Tools;
-using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace LLMNetHelper.Agent;
@@ -29,18 +28,6 @@ public static class AgentRegistration
     }
 
     /// <summary>
-    /// Регистрирует нативный оркестратор.
-    /// </summary>
-    public static IServiceCollection AddNativeOrchestrator(
-        this IServiceCollection services,
-        AgentOrchestrationOptions options)
-    {
-        services.AddSingleton(options);
-        services.AddSingleton<IAgentOrchestrator, NativeAgentOrchestrator>();
-        return services;
-    }
-
-    /// <summary>
     /// Регистрирует оркестратор по имени из конфигурации.
     /// <para>
     /// "native" — доступен всегда. "semantic-kernel" включается только при
@@ -57,22 +44,10 @@ public static class AgentRegistration
         {
             "native" or "" => services.AddSingleton<IAgentOrchestrator, NativeAgentOrchestrator>(),
             "semantic-kernel" or "sk" => throw new InvalidOperationException(
-                "Оркестратор 'semantic-kernel' требует отдельного проекта LLMNetHelper.Orchestration.SemanticKernel. " +
-                "Пока он не подключён, используйте Agent:Orchestration:Orchestrator=native."),
+                "Оркестратор 'semantic-kernel' требует подключения LLMCore.Orchestration.SemanticKernel " +
+                "(AddSemanticKernelOrchestrator). Пока он не подключён, используйте Agent:Orchestration:Orchestrator=native."),
             var other => throw new InvalidOperationException(
                 $"Неизвестный оркестратор: '{other}'. Допустимо: native, semantic-kernel.")
         };
-    }
-
-    /// <summary>
-    /// Регистрирует <see cref="IChatClient"/> из готовой фабрики.
-    /// Вызывается из проекта Llm, где живёт транспорт.
-    /// </summary>
-    public static IServiceCollection AddChatClient(
-        this IServiceCollection services,
-        Func<IServiceProvider, IChatClient> factory)
-    {
-        services.AddSingleton(factory);
-        return services;
     }
 }
