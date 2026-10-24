@@ -1,0 +1,296 @@
+using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Logging;
+using LLMNetHelper.Agent.Tools;
+using LLMNetHelper.Chat.Tools;
+using LLMCore.Abstractions;
+
+namespace LLMNetHelper.Chat;
+
+/// <summary>
+/// Консольный REPL-чат по скачанным репозиториям (<c>GitLab:CloneRoot</c>).
+/// <para>
+/// Режим A (по умолчанию): вопрос → BM25-поиск контекста через
+/// <see cref="ChatScope"/> → один ответ <see cref="IChatClient"/>.
+/// Режим B (<c>/tools</c>): агентский ReAct-цикл (<see cref="ChatAgentLoop"/>)
+/// с инструментами <c>repo_search</c> / <c>repo_read_file</c> / <c>repo_list_files</c>.
+/// </para>
+/// <para>
+/// Неинтерактивный прогон: <c>--ask="…"</c> — один вопрос и выход.
+/// Ввод/вывод параметризуются (<see cref="TextReader"/>/<see cref="TextWriter"/>) —
+/// тесты не требуют консоли.
+/// </para>
+/// </summary>
+public sealed class ChatSession
+{
+    private readonly IChatClient _chat;
+    private readonly ChatScope _scope;
+    private readonly ChatOptions _options;
+    private readonly LlmOptions _llmOptions;
+    private readonly ILoggerFactory _loggerFactory;
+    private readonly TextReader _in;
+    private readonly TextWriter _out;
+
+    private readonly List<ChatMessage> _history = [];
+    private bool _toolsMode;
+
+    public ChatSession(
+        IChatClient chat,
+        ChatScope scope,
+        ChatOptions options,
+        LlmOptions llmOptions,
+        ILoggerFactory loggerFactory,
+        TextReader @in,
+        TextWriter @out)
+    {
+        _chat = chat;
+        _scope = scope;
+        _options = options;
+        _llmOptions = llmOptions;
+        _loggerFactory = loggerFactory;
+        _in = @in;
+        _out = @out;
+    }
+
+    /// <summary>Текущий режим /tools (для тестов и диагностики).</summary>
+    public bool ToolsMode => _toolsMode;
+
+    /// <summary>
+    /// Запускает сеанс: одиночный вопрос (<paramref name="ask"/>) или интерактивный REPL.
+    /// </summary>
+    /// <returns>0 — успех, 1 — сбой, 4 — репозиторий не найден.</returns>
+    public async Task<int> RunAsync(string? ask, string? repo, bool tools, CancellationToken ct)
+    {
+        _toolsMode = tools;
+
+        if (!string.IsNullOrWhiteSpace(repo))
+        {
+            var ok = _scope.TrySetRepo(repo, out var msg);
+            _out.WriteLine($"[chat] {msg}");
+            if (!ok)
+            {
+                return 4;
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(ask))
+        {
+            // Неинтерактивный режим: один вопрос и выход.
+            var answer = await AnswerAsync(ask.Trim(), ct).ConfigureAwait(false);
+            _out.WriteLine(answer);
+            return IsFailure(answer) ? 1 : 0;
+        }
+
+        PrintBanner();
+
+        while (!ct.IsCancellationRequested)
+        {
+            _out.Write("> ");
+            _out.Flush();
+
+            string? line;
+            try
+            {
+                line = _in.ReadLine();
+            }
+            catch (IOException)
+            {
+                // Закрытый stdin (CI/перенаправления) — завершаем сеанс.
+                break;
+            }
+
+            if (line is null)
+            {
+                // EOF (Ctrl+Z / закрытый поток) — выход.
+                _out.WriteLine();
+                break;
+            }
+
+            var command = ChatCommandParser.Parse(line);
+
+            switch (command.Kind)
+            {
+                case ChatCommandKind.Message:
+                    if (string.IsNullOrWhiteSpace(command.Argument))
+                    {
+                        continue;
+                    }
+
+                    var answer = await AnswerAsync(command.Argument, ct).ConfigureAwait(false);
+                    _out.WriteLine(answer);
+                    _out.WriteLine();
+                    break;
+
+                case ChatCommandKind.Help:
+                    PrintHelp();
+                    break;
+
+                case ChatCommandKind.Exit:
+                    _out.WriteLine("[chat] До встречи.");
+                    return 0;
+
+                case ChatCommandKind.Repos:
+                    PrintRepos();
+                    break;
+
+                case ChatCommandKind.Repo:
+                    _scope.TrySetRepo(command.Argument, out var scopeMsg);
+                    _out.WriteLine($"[chat] {scopeMsg}");
+                    break;
+
+                case ChatCommandKind.Tools:
+                    _toolsMode = !_toolsMode;
+                    _out.WriteLine($"[chat] Режим инструментов: {(_toolsMode ? "включён (ReAct-цикл)" : "выключен (поиск контекста)")}.");
+                    break;
+
+                case ChatCommandKind.Clear:
+                    _history.Clear();
+                    _out.WriteLine("[chat] История очищена.");
+                    break;
+
+                case ChatCommandKind.Status:
+                    PrintStatus();
+                    break;
+
+                case ChatCommandKind.Unknown:
+                    _out.WriteLine($"[chat] Неизвестная команда: {command.Argument}. Введите /help.");
+                    break;
+            }
+        }
+
+        return 0;
+    }
+
+    /// <summary>
+    /// Один вопрос: режим A (поиск контекста → ответ) либо режим B (ReAct-цикл).
+    /// Возвращает текст ответа; пары вопрос/ответ добавляются в историю.
+    /// </summary>
+    public async Task<string> AnswerAsync(string question, CancellationToken ct)
+    {
+        try
+        {
+            if (_toolsMode)
+            {
+                var loop = new ChatAgentLoop(
+                    _chat,
+                    BuildToolRegistry(),
+                    _options,
+                    _loggerFactory.CreateLogger<ChatAgentLoop>());
+
+                var messages = NewConversation(withTools: true);
+                var answer = await loop.RunAsync(messages, question, ct).ConfigureAwait(false);
+                AppendHistory(question, answer);
+                return answer;
+            }
+
+            // Режим A: BM25-поиск по области → промпт → один ответ.
+            var search = await _scope.SearchAsync(question, ct).ConfigureAwait(false);
+
+            var messagesA = NewConversation(withTools: false);
+            messagesA.Add(new ChatMessage(ChatRole.User, ChatPromptBuilder.BuildUserPrompt(question, search.Documents)));
+
+            var response = await _chat.GetResponseAsync(messagesA, cancellationToken: ct).ConfigureAwait(false);
+            var text = response.Text ?? "[пустой ответ]";
+
+            AppendHistory(question, text);
+            return text;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _loggerFactory.CreateLogger<ChatSession>().LogError(ex, "Чат: сбой обработки вопроса");
+            return $"[Сбой: {ex.Message}]";
+        }
+    }
+
+    /// <summary>Диалог без истории: системный промпт + история (для ReAct-цикла).</summary>
+    private List<ChatMessage> NewConversation(bool withTools)
+    {
+        var messages = new List<ChatMessage>
+        {
+            new(ChatRole.System, ChatPromptBuilder.BuildSystemPrompt(
+                DescribeScope(),
+                withTools,
+                withTools ? BuildToolRegistry().DescribeForPrompt() : null))
+        };
+        messages.AddRange(_history);
+        return messages;
+    }
+
+    private ToolRegistry BuildToolRegistry() => new([
+        new RepoSearchTool(_scope),
+        new RepoReadFileTool(_scope, _options),
+        new RepoListFilesTool(_scope, _options)
+    ]);
+
+    private void AppendHistory(string question, string answer)
+    {
+        _history.Add(new ChatMessage(ChatRole.User, question));
+        _history.Add(new ChatMessage(ChatRole.Assistant, answer));
+
+        // Обрезка по HistoryMessages (считаем сообщения, не пары).
+        var max = Math.Max(2, _options.HistoryMessages);
+        if (_history.Count > max)
+        {
+            _history.RemoveRange(0, _history.Count - max);
+        }
+    }
+
+    private static bool IsFailure(string answer) =>
+        answer.StartsWith("[Сбой", StringComparison.Ordinal) ||
+        answer.StartsWith("[Модель вернула пустой ответ]", StringComparison.Ordinal);
+
+    private string DescribeScope()
+    {
+        return _scope.CurrentRepo is null
+            ? $"все репозитории каталога {_scope.CloneRoot}"
+            : $"репозиторий {_scope.CurrentRepo} ({_scope.RootPath})";
+    }
+
+    private void PrintBanner()
+    {
+        _out.WriteLine("=== LLMNetHelper Chat ===");
+        _out.WriteLine($"Модель : {_llmOptions.Model} @ {_llmOptions.Endpoint}");
+        _out.WriteLine($"Область: {DescribeScope()}");
+        _out.WriteLine("Команды: /help — справка, /exit — выход.");
+        _out.WriteLine();
+    }
+
+    private void PrintHelp()
+    {
+        _out.WriteLine("/help            — эта справка");
+        _out.WriteLine("/exit | /quit    — выход");
+        _out.WriteLine("/repos           — список репозиториев в CloneRoot");
+        _out.WriteLine("/repo <имя>      — сузить поиск на один репозиторий (без имени — все)");
+        _out.WriteLine("/tools           — переключить агентский режим (ReAct: repo_search/repo_read_file/repo_list_files)");
+        _out.WriteLine("/clear           — очистить историю диалога");
+        _out.WriteLine("/status          — текущая область, модель, режим");
+    }
+
+    private void PrintRepos()
+    {
+        var repos = _scope.ListRepos();
+        if (repos.Count == 0)
+        {
+            _out.WriteLine($"[chat] В каталоге {_scope.CloneRoot} нет репозиториев. Сначала выполните: run_LLMNetHelper.ps1 -CloneAll");
+            return;
+        }
+
+        _out.WriteLine($"[chat] Репозитории ({repos.Count}) в {_scope.CloneRoot}:");
+        foreach (var r in repos)
+        {
+            var marker = string.Equals(r, _scope.CurrentRepo, StringComparison.OrdinalIgnoreCase) ? "* " : "  ";
+            _out.WriteLine($"{marker}{r}");
+        }
+    }
+
+    private void PrintStatus()
+    {
+        _out.WriteLine($"[chat] Область : {DescribeScope()}");
+        _out.WriteLine($"[chat] Модель  : {_llmOptions.Model}");
+        _out.WriteLine($"[chat] Режим   : {(_toolsMode ? "/tools (ReAct)" : "поиск контекста (BM25)")}");
+        _out.WriteLine($"[chat] История: {_history.Count} сообщений (лимит {_options.HistoryMessages})");
+    }
+}

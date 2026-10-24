@@ -1,10 +1,13 @@
 using System.Text;
 using LLMNetHelper;
+using LLMNetHelper.Chat;
 using LLMNetHelper.GitLab;
+using LLMCore.Abstractions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Serilog;
 
 namespace LLMNetHelper;
@@ -63,6 +66,12 @@ internal static class Program
                 return await RunCloneAllAsync(host, forceClone: args.Contains("--force-clone"));
             }
 
+            // --- Режим: интерактивный чат по скачанным репозиториям ---
+            if (args.Contains("--chat"))
+            {
+                return await RunChatAsync(host, args);
+            }
+
             var runNow = args.Contains("--run-now");
             var dryRun = args.Contains("--dry-run");
 
@@ -98,6 +107,117 @@ internal static class Program
             // Корректное закрытие логгера при остановке
             Log.CloseAndFlush();
         }
+    }
+
+    /// <summary>
+    /// Режим <c>--chat</c>: консольный чат с LLM по вопросам из каталога
+    /// скачанных репозиториев (<c>GitLab:CloneRoot</c>).
+    /// <para>
+    /// Hosted-сервисы (<c>HealthServer</c>, <c>NightlyScheduleHostedService</c>)
+    /// стартуют ВСЕГДА — требование наблюдаемости: health-эндпоинт доступен
+    /// и во время чата. Остановка хоста — в <c>finally</c>.
+    /// </para>
+    /// </summary>
+    /// <param name="host">Собранный хост агента.</param>
+    /// <param name="args">Аргументы командной строки (<c>--ask=</c>, <c>--repo=</c>, <c>--tools</c>).</param>
+    /// <returns>0 — успех, 1 — сбой LLM/IO/хоста, 4 — неверная конфигурация.</returns>
+    private static async Task<int> RunChatAsync(IHost host, string[] args)
+    {
+        var ask = GetOptionValue(args, "--ask");
+        var repo = GetOptionValue(args, "--repo");
+        var tools = args.Contains("--tools");
+
+        ChatOptions chatOptions;
+        LlmOptions llmOptions;
+        GitLabOptions gitLabOptions;
+
+        try
+        {
+            chatOptions = host.Services.GetRequiredService<ChatOptions>();
+            llmOptions = host.Services.GetRequiredService<IOptions<LlmOptions>>().Value;
+            gitLabOptions = host.Services.GetRequiredService<GitLabOptions>();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ERROR] Не удалось разрешить сервисы чата: {ex.Message}");
+            return 4;
+        }
+
+        if (string.IsNullOrWhiteSpace(llmOptions.Endpoint) || string.IsNullOrWhiteSpace(llmOptions.ApiKey))
+        {
+            Console.WriteLine("[ERROR] Llm:Endpoint / Llm:ApiKey пустые — чат не сможет обратиться к модели.");
+            Console.WriteLine("[HINT]  Задайте LLM__ENDPOINT и LLM__APIKEY в src/LLMNetHelper/.env.");
+            return 4;
+        }
+
+        var cloneRoot = Path.GetFullPath(gitLabOptions.CloneRoot);
+        if (!Directory.Exists(cloneRoot))
+        {
+            Console.WriteLine($"[ERROR] Каталог репозиториев не найден: {cloneRoot}");
+            Console.WriteLine("[HINT]  Сначала скачайте репозитории: run_LLMNetHelper.ps1 -CloneAll");
+            return 4;
+        }
+
+        Console.WriteLine($"[INFO] Чат по репозиториям: {cloneRoot} (модель {llmOptions.Model})");
+        Console.WriteLine("[INFO] Команды: /help — справка, /exit — выход.");
+
+        // Hosted-сервисы стартуют ВСЕГДА (наблюдаемость): health-эндпоинт и
+        // планировщик работают весь сеанс чата.
+        try
+        {
+            await host.StartAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ERROR] Не удалось запустить hosted-сервисы (health/планировщик): {ex.Message}");
+            return 1;
+        }
+
+        try
+        {
+            var scope = new ChatScope(gitLabOptions, chatOptions);
+            var session = new ChatSession(
+                host.Services.GetRequiredService<Microsoft.Extensions.AI.IChatClient>(),
+                scope,
+                chatOptions,
+                llmOptions,
+                host.Services.GetRequiredService<ILoggerFactory>(),
+                Console.In,
+                Console.Out);
+
+            return await session.RunAsync(ask, repo, tools, CancellationToken.None);
+        }
+        catch (OperationCanceledException)
+        {
+            Console.WriteLine("[INFO] Чат отменён.");
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ERROR] Сбой чата: {Describe(ex)}");
+            return 1;
+        }
+        finally
+        {
+            await host.StopAsync();
+        }
+    }
+
+    /// <summary>
+    /// Значение опции формата <c>--имя=значение</c> (префиксный разбор, как у
+    /// <c>--hours=</c> в прогоне). <c>null</c> — опция не задана.
+    /// </summary>
+    private static string? GetOptionValue(string[] args, string prefix)
+    {
+        foreach (var arg in args)
+        {
+            if (arg.StartsWith(prefix + "=", StringComparison.Ordinal))
+            {
+                return arg[(prefix.Length + 1)..];
+            }
+        }
+
+        return null;
     }
 
     /// <summary>

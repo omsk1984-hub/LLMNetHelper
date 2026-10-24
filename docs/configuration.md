@@ -149,3 +149,31 @@ Health-порт должен быть свободен. `HttpListener` на `htt
 Агент создаёт ветку `fix/ai-{runId}`, применяет правку через AST, прогоняет
 `dotnet build` + `dotnet test`, коммитит при успехе. **Push не выполняется.**
 Любой провал → полный откат репозитория.
+
+## Чат (`Chat:*`) — режим `-Chat`
+
+Консольный REPL-чат с LLM по вопросам из каталога скачанных репозиториев
+(`GitLab:CloneRoot`, по умолчанию `repos/GPM`). Запуск:
+`run_LLMNetHelper.ps1 -Chat` (подробности — [`docs/runbook.md`](runbook.md)).
+
+Hosted-сервисы (`HealthServer` + планировщик) в режиме чата стартуют
+**всегда** — наблюдаемость сохраняется, health-порт должен быть свободен.
+
+| Параметр | Env | Дефолт | Описание |
+|---|---|---|---|
+| `Include` | `CHAT__INCLUDE__0` | `**/*.md`, `**/*.cs`, `**/*.csproj`, … | Glob-шаблоны файлов для поиска (код + документы) |
+| `TopK` | `CHAT__TOPK` | `8` | Фрагментов контекста на один вопрос |
+| `MaxChars` | `CHAT__MAXCHARS` | `6000` | Символов на один фрагмент |
+| `TotalCharsBudget` | `CHAT__TOTALCHARSBUDGET` | `24000` | Бюджет символов контекста на вопрос |
+| `MaxFiles` | `CHAT__MAXFILES` | `20000` | Лимит файлов за один обход CloneRoot |
+| `MaxFileBytes` | `CHAT__MAXFILEBYTES` | `524288` | Лимит размера файла |
+| `ChunkSize` / `ChunkOverlap` | `CHAT__CHUNKSIZE` / `CHAT__CHUNKOVERLAP` | `3000` / `300` | Нарезка длинных файлов |
+| `HistoryMessages` | `CHAT__HISTORYMESSAGES` | `20` | Сообщений диалога в истории |
+| `MaxSteps` | `CHAT__MAXSTEPS` | `8` | Лимит итераций ReAct (режим `/tools`) |
+| `ToolCallLimit` | `CHAT__TOOLCALLLIMIT` | `30` | Лимит вызовов инструментов за вопрос |
+| `ListLimit` | `CHAT__LISTLIMIT` | `200` | Лимит `repo_list_files` |
+
+Исключения (`bin/obj/node_modules/.git/.env/*.key/…`) наследуются дефолтами
+`LocalFolderOptions.Exclude`. Секреты в выдаче инструментов режутся `Redactor`.
+Токен GitLab (`GITLAB__TOKEN`) для чата **не требуется** — работа идёт с
+локальными копиями; обязательны `LLM__ENDPOINT` + `LLM__APIKEY`.

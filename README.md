@@ -4,6 +4,9 @@
 с привлечением документации проекта и анализа C#-кода, а при необходимости —
 предлагает и применяет правку в отдельной ветке.
 
+Дополнительно — интерактивный режим `-Chat`: консольный чат с ИИ по вопросам
+из каталога скачанных репозиториев GitLab (`GitLab:CloneRoot`, см. `-CloneAll`).
+
 Репозиторий **автономен**: собственное решение, своя конфигурация, никаких
 зависимостей от других репозиториев. Относительные пути в `.env` разрешаются
 от корня репозитория. Подробная документация — в [`docs/`](docs/README.md):
@@ -73,6 +76,9 @@ dotnet test  src/LLMNetHelper/LLMNetHelper.slnx
 
 # Запуск раннера (.ps1 ассоциирован с notepad — вызывать pwsh явно):
 pwsh -NoProfile -Command "[Console]::OutputEncoding=[Text.Encoding]::UTF8; $OutputEncoding=[Text.Encoding]::UTF8; chcp 65001 > $null; & 'src/LLMNetHelper/run_LLMNetHelper.ps1' -NoPause"
+
+# Чат по скачанным репозиториям (сначала -CloneAll; нужны LLM__ENDPOINT/LLM__APIKEY):
+pwsh -NoProfile -Command "[Console]::OutputEncoding=[Text.Encoding]::UTF8; $OutputEncoding=[Text.Encoding]::UTF8; chcp 65001 > $null; & 'src/LLMNetHelper/run_LLMNetHelper.ps1' -Chat"
 ```
 
 ## Ключевые принципы
@@ -147,6 +153,22 @@ pwsh -NoProfile -Command "[Console]::OutputEncoding=[Text.Encoding]::UTF8; $Outp
 | `CodeChange:Enabled` | `false` | **Разрешить агенту менять код** |
 | `CodeChange:RepositoryPath` | — | Корень git-репозитория |
 | `CodeChange:RequireCleanWorktree` | `true` | Отказ при грязном дереве |
+
+### Чат (`Chat:*`, режим `-Chat`)
+
+| Параметр | По умолчанию | Описание |
+|---|---|---|
+| `Chat:Include` | код + документы (glob) | Шаблоны файлов CloneRoot для поиска |
+| `Chat:TopK` | `8` | Фрагментов контекста на вопрос |
+| `Chat:HistoryMessages` | `20` | Сообщений диалога в истории |
+| `Chat:MaxSteps` / `Chat:ToolCallLimit` | `8` / `30` | Лимиты агентского режима `/tools` |
+
+Поиск — BM25 по `GitLab:CloneRoot` (переиспользует слой контекста);
+`/repo <имя>` сужает область до одного репозитория; `/tools` включает
+ReAct-цикл с инструментами `repo_search` / `repo_read_file` / `repo_list_files`
+(белый список + guard путей + `Redactor`). Hosted-сервисы (health/планировщик)
+в режиме чата стартуют всегда. Подробно — [`docs/configuration.md`](docs/configuration.md)
+и [`docs/runbook.md`](docs/runbook.md).
 
 ## Провайдеры LLM и Semantic Kernel
 

@@ -1,6 +1,7 @@
 using LLMNetHelper.Abstractions;
 using LLMNetHelper.Agent;
 using LLMNetHelper.Agent.Orchestration;
+using LLMNetHelper.Chat;
 using LLMNetHelper.CodeChange;
 using LLMNetHelper.Context;
 using LLMNetHelper.Core.Collection;
@@ -56,6 +57,14 @@ public static class DependencyInjection
             .GetSection(AgentOrchestrationOptions.SectionName)
             .Get<AgentOrchestrationOptions>()
             ?? new AgentOrchestrationOptions();
+        var chatOptions = configuration
+            .GetSection(ChatOptions.SectionName)
+            .Get<ChatOptions>()
+            ?? new ChatOptions();
+
+        // Режим чата (--chat): параметры областью поиска CloneRoot. Регистрация
+        // готового синглтона, а не IOptions<>: чат создаётся вне hosted-слоя.
+        services.AddSingleton(chatOptions);
 
         // --- Хранилище фактов ---
         services.AddSingleton<IFactStore>(sp =>

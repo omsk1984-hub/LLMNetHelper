@@ -15,7 +15,7 @@ UTF-8-префикс обязателен: консоль стартует в CP
 
 ## Режимы раннера (взаимоисключающие)
 
-Порядок проверки: `-Test` > `-Check` > `-Info` > `-Stop` > `-Daemon` > `-RunNow` > `-DryRun`.
+Порядок проверки: `-Test` > `-Check` > `-Info` > `-Stop` > `-CloneAll` > `-Chat` > `-Daemon` > `-RunNow` > `-DryRun`.
 
 | Команда | Действие |
 |---|---|
@@ -29,6 +29,10 @@ UTF-8-префикс обязателен: консоль стартует в CP
 | `-Test` | `dotnet test` по решению `src/LLMNetHelper/LLMNetHelper.slnx` |
 | `-CloneAll` | Скачать/обновить все репозитории группы GitLab в `GitLab:CloneRoot` (включает GitLab только на этот запуск) |
 | `-CloneAll -ForceClone` | То же, но существующие клоны удаляются и клонируются заново |
+| `-Chat` | Интерактивный чат с ИИ по скачанным репозиториям (`GitLab:CloneRoot`); требует `LLM__ENDPOINT`/`LLM__APIKEY`, токен GitLab не нужен |
+| `-Chat -Ask "вопрос"` | Один вопрос и выход (для скриптов/CI) |
+| `-Chat -Repo <имя>` | Начать чат, сузив поиск до одного репозитория `CloneRoot/<имя>` |
+| `-Chat -Tools` | Начать чат в агентском режиме (ReAct + инструменты `repo_search`/`repo_read_file`/`repo_list_files`) |
 | `-Info` | Показать разрешённую конфигурацию (пути, порты, существование каталогов) |
 | `-NoBuild` | Не пересобирать перед запуском |
 | `-Roslyn` / `-CodeChange` | Включить соответствующие подсистемы только для этого запуска (переопределяют `.env`) |
@@ -110,6 +114,35 @@ pwsh -NoProfile -Command "[Console]::OutputEncoding=[Text.Encoding]::UTF8; $Outp
     **игнорируется**, а запрос с `simple=true` поле `archived` не возвращает
     (поэтому из URL он убран). Вернуть архивные в прогон:
     `GITLAB__EXCLUDEARCHIVED=false`.
+
+### Чат по скачанным репозиториям
+
+```powershell
+# 1. Скачать репозитории группы (однократно, нужен GITLAB__TOKEN)
+pwsh -NoProfile -Command "[Console]::OutputEncoding=[Text.Encoding]::UTF8; $OutputEncoding=[Text.Encoding]::UTF8; chcp 65001 > $null; & 'src/LLMNetHelper/run_LLMNetHelper.ps1' -NoPause -CloneAll"
+
+# 2. Интерактивный чат (нужны LLM__ENDPOINT + LLM__APIKEY, токен не нужен)
+pwsh -NoProfile -Command "[Console]::OutputEncoding=[Text.Encoding]::UTF8; $OutputEncoding=[Text.Encoding]::UTF8; chcp 65001 > $null; & 'src/LLMNetHelper/run_LLMNetHelper.ps1' -Chat"
+
+# Один вопрос и выход (CI/скрипты):
+pwsh -NoProfile -Command "[Console]::OutputEncoding=[Text.Encoding]::UTF8; $OutputEncoding=[Text.Encoding]::UTF8; chcp 65001 > $null; & 'src/LLMNetHelper/run_LLMNetHelper.ps1' -NoPause -Chat -Ask 'Что делает класс Writer?'"
+```
+
+- Команды REPL: `/help`, `/exit`, `/repos` (список репозиториев),
+  `/repo <имя>` (сузить поиск; без имени — снова все), `/tools` (переключить
+  агентский ReAct-цикл), `/clear` (история), `/status`.
+- По умолчанию вопрос → BM25-поиск фрагментов по `GitLab:CloneRoot` → ответ
+  модели с цитированием путей. В режиме `/tools` модель сама вызывает
+  `repo_search` / `repo_read_file` / `repo_list_files` (белый список,
+  guard путей внутри CloneRoot, секреты режутся `Redactor`).
+- **Hosted-сервисы стартуют всегда** (наблюдаемость): health-эндпоинт
+  `http://localhost:<Agent:HealthPort>/health` доступен всё время чата,
+  ночной планировщик работает. Поэтому порт health не должен быть занят
+  демоном — иначе раннер откажет (код 4): остановите демона `-Stop` или
+  задайте другой `AGENT__HEALTHPORT`.
+- Настройки поиска/лимитов — секция `Chat` (см. [`docs/configuration.md`](configuration.md)).
+- Коды возврата: `0` — сеанс завершён, `1` — сбой LLM/IO/хоста,
+  `4` — конфигурация (пустые креды LLM, нет CloneRoot/репозитория, занят порт).
 
 ### Проверка конфигурации перед включением правок
 1. `CODECHANGE__ENABLED=false` — дефолт, не менять «на всякий случай».

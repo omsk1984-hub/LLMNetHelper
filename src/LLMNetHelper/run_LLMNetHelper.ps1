@@ -11,13 +11,23 @@
 #   pwsh -File src/LLMNetHelper/run_LLMNetHelper.ps1 -Test               # dotnet test по решению LLMNetHelper.slnx
 #   pwsh -File src/LLMNetHelper/run_LLMNetHelper.ps1 -CloneAll           # скачать/обновить все репозитории группы GitLab
 #   pwsh -File src/LLMNetHelper/run_LLMNetHelper.ps1 -CloneAll -ForceClone  # переклонировать заново (удалить существующие)
+#   pwsh -File src/LLMNetHelper/run_LLMNetHelper.ps1 -Chat               # интерактивный чат с ИИ по скачанным репозиториям (GitLab:CloneRoot)
+#   pwsh -File src/LLMNetHelper/run_LLMNetHelper.ps1 -Chat -Ask "вопрос" # один вопрос и выход (для скриптов/CI)
+#   pwsh -File src/LLMNetHelper/run_LLMNetHelper.ps1 -Chat -Repo name    # начать чат с одним репозиторием из CloneRoot
+#   pwsh -File src/LLMNetHelper/run_LLMNetHelper.ps1 -Chat -Tools        # начать чат в агентском режиме (ReAct + repo_*-инструменты)
 #   pwsh -File src/LLMNetHelper/run_LLMNetHelper.ps1 -Info               # показать разрешённую конфигурацию
 #   pwsh -File src/LLMNetHelper/run_LLMNetHelper.ps1 -NoBuild ...        # без пересборки
 #   pwsh -File src/LLMNetHelper/run_LLMNetHelper.ps1 -NoPause ...        # не ждать клавиши (автозапуски/CI)
 #   pwsh -File src/LLMNetHelper/run_LLMNetHelper.ps1 -SkipPull ...       # не обновлять репозиторий перед прогоном
 #
 # Режимы (взаимно исключают друг друга, проверяются в этом порядке):
-#   -Test > -Check > -Info > -Stop > -CloneAll > -Daemon > -RunNow > -DryRun (умолчание)
+#   -Test > -Check > -Info > -Stop > -CloneAll > -Chat > -Daemon > -RunNow > -DryRun (умолчание)
+#
+# Режим -Chat: интерактивный REPL по вопросам из GitLab:CloneRoot (см. -CloneAll).
+# Hosted-сервисы (health/планировщик) в этом режиме стартуют ВСЕГДА — порт
+# health должен быть свободен (остановите демона: -Stop). Команды чата:
+# /help /exit /repos /repo <имя> /tools /clear /status. Требуется LLM__ENDPOINT
+# и LLM__APIKEY; GITLAB__TOKEN не требуется (работа с локальными копиями).
 #
 # УМОЛЧАНИЕ — -DryRun: детерминированный сбор фактов из Loki/Prometheus и
 # snapshot-отчёт БЕЗ обращения к LLM. Это безопасно (не тратит токены, не
@@ -56,6 +66,10 @@ param(
     [switch]$Test,
     [switch]$CloneAll,
     [switch]$ForceClone,
+    [switch]$Chat,
+    [string]$Ask = "",
+    [string]$Repo = "",
+    [switch]$Tools,
 
     # --- Параметры прогона ---
     [int]$Hours = 0,
@@ -515,6 +529,83 @@ if ($CloneAll -or $ForceClone) {
         1 { Write-Host "[clone] Есть неудачные операции — см. лог $logFile" -ForegroundColor Red }
         4 { Write-Host "[clone] Неверная конфигурация GitLab (токен/группа/права)." -ForegroundColor Red }
         default { Write-Host "[clone] Код возврата $exitCode." -ForegroundColor Yellow }
+    }
+
+    Exit-WithPause $exitCode
+}
+
+# ===============================================================
+# РЕЖИМ: -Chat (консольный чат с ИИ по скачанным репозиториям)
+# ===============================================================
+# -Ask / -Repo / -Tools подразумевают -Chat.
+if ($Ask -or $Repo -or $Tools) { $Chat = $true }
+
+if ($Chat) {
+    if (-not $LlmEndpoint) {
+        Write-Host "[chat] LLM__ENDPOINT пуст: чат не сможет обратиться к модели." -ForegroundColor Red
+        Write-Host "[chat] Задайте LLM__ENDPOINT/LLM__APIKEY в $ScriptDir\.env" -ForegroundColor DarkGray
+        Exit-WithPause 4
+    }
+    if (-not $LlmApiKey) {
+        Write-Host "[chat] LLM__APIKEY пуст: запрос к $($LlmEndpoint) получит 401." -ForegroundColor Red
+        Write-Host "[chat] Задайте ключ в $ScriptDir\.env" -ForegroundColor DarkGray
+        Exit-WithPause 4
+    }
+    if (-not (Test-Path $GitLabCloneRoot)) {
+        Write-Host "[chat] Каталог репозиториев не найден: $GitLabCloneRoot" -ForegroundColor Red
+        Write-Host "[chat] Сначала скачайте репозитории: run_LLMNetHelper.ps1 -CloneAll" -ForegroundColor DarkGray
+        Exit-WithPause 4
+    }
+    if ($Repo -and -not (Test-Path (Join-Path $GitLabCloneRoot $Repo))) {
+        Write-Host "[chat] Репозиторий не найден: $GitLabCloneRoot\$Repo" -ForegroundColor Red
+        Write-Host "[chat] Список репозиториев: run_LLMNetHelper.ps1 -Chat затем /repos" -ForegroundColor DarkGray
+        Exit-WithPause 4
+    }
+    # Hosted-сервисы (HealthServer + планировщик) стартуют всегда — и в чате,
+    # для наблюдаемости. Занятый порт health = демон уже работает.
+    if (Test-AgentPort ([int]$HealthPort)) {
+        Write-Host "[chat] Порт health ($HealthPort) уже занят — демон, вероятно, запущен." -ForegroundColor Yellow
+        Write-Host "[chat] Чат не займёт порт. Остановите демона: run_LLMNetHelper.ps1 -Stop" -ForegroundColor DarkGray
+        Write-Host "[chat] Либо задайте другой AGENT__HEALTHPORT в .env." -ForegroundColor DarkGray
+        Exit-WithPause 4
+    }
+
+    Invoke-Build
+
+    # Каталог клонирования передаём нормализованным абсолютным путём (как в
+    # -CloneAll): относительный разрешился бы от рабочего каталога процесса.
+    [System.Environment]::SetEnvironmentVariable("GITLAB__CLONEROOT", $GitLabCloneRoot, "Process")
+
+    $appArgs = @("--chat")
+    if ($Ask)  { $appArgs += "--ask=$Ask" }
+    if ($Repo) { $appArgs += "--repo=$Repo" }
+    if ($Tools) { $appArgs += "--tools" }
+
+    Write-Host "[chat] Каталог : $GitLabCloneRoot" -ForegroundColor Cyan
+    Write-Host "[chat] Модель  : $LlmModel @ $LlmEndpoint" -ForegroundColor Cyan
+    Write-Host "[chat] Режим   : $(if ($Tools) { 'агентский (/tools, ReAct)' } else { 'поиск контекста (BM25)' })$(if ($Repo) { "; репозиторий $Repo" } else { '' })" -ForegroundColor Cyan
+    if (-not $Ask) {
+        Write-Host "[chat] Команды : /help — справка, /exit — выход. Health: http://localhost:$HealthPort/health" -ForegroundColor DarkGray
+    }
+
+    # ВАЖНО: без Tee-Object/перенаправлений — интерактивный stdin должен
+    # доходить до процесса dotnet. Логи приложения — через Serilog в logs.
+    $dotnetArgs = @("run", "--project", $Project, "-c", $Configuration, "--no-build", "--") + $appArgs
+
+    $exitCode = 0
+    try {
+        & $dotnet @dotnetArgs
+        $exitCode = $LASTEXITCODE
+    } catch {
+        Write-Host "[chat] Ошибка запуска: $_" -ForegroundColor Red
+        $exitCode = 1
+    }
+
+    switch ($exitCode) {
+        0 { Write-Host "[chat] Завершено." -ForegroundColor Green }
+        1 { Write-Host "[chat] Сбой чата (LLM/IO/хост)." -ForegroundColor Red }
+        4 { Write-Host "[chat] Неверная конфигурация (LLM-креды / CloneRoot / порт health)." -ForegroundColor Red }
+        default { Write-Host "[chat] Код возврата $exitCode." -ForegroundColor Yellow }
     }
 
     Exit-WithPause $exitCode
