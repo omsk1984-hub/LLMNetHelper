@@ -155,7 +155,8 @@ public sealed class GitLabCloneAllTool : IAgentTool
                 foreach (var detail in result.Details)
                 {
                     var status = detail.Success ? "ok" : "FAIL" + (detail.Error != null ? $" — {detail.Error}" : "");
-                    sb.AppendLine($"  - {detail.RepoName}: {detail.Action} ({status})");
+                    var note = detail.Note != null ? $" [{detail.Note}]" : "";
+                    sb.AppendLine($"  - {detail.RepoName}: {detail.Action} ({status}){note}");
                 }
             }
 

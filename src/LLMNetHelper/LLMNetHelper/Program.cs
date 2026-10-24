@@ -147,7 +147,11 @@ internal static class Program
         var progress = new SyncProgress<RepoOperationResult>(r =>
         {
             var mark = r.Success ? "OK  " : "FAIL";
-            Console.WriteLine($"[{mark}] {r.Action,-8} {r.RepoName} ({r.DurationMs} ms){(r.Error != null ? " — " + r.Error : "")}");
+            var suffix = r.Error != null ? " — " + r.Error : "";
+            // Служебная пометка (автопереклонирование неполного клона,
+            // очистка lock-файлов) показывается и при успехе.
+            var note = r.Note != null ? (r.Success ? " — " : " | ") + r.Note : "";
+            Console.WriteLine($"[{mark}] {r.Action,-8} {r.RepoName} ({r.DurationMs} ms){suffix}{note}");
         });
 
         try
