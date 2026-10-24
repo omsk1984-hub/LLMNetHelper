@@ -29,6 +29,17 @@ public sealed class CustomOpenAiCompatibleClient : IAnalysisLlmClient
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         var fallbackUsed = false;
 
+        // Пустая схема — свободный ответ (режим чата, план 18/19): response_format
+        // не отправляется вовсе. Без этой ветки JsonDocument.Parse("") падал
+        // с «The input does not contain any JSON tokens» — чат с реальным LLM
+        // не работал бы вообще (выявлено интеграционным тестом).
+        if (string.IsNullOrWhiteSpace(request.ExpectedJsonSchema))
+        {
+            var plain = await SendWithoutSchemaAsync(request, ct);
+            stopwatch.Stop();
+            return ParseResponse(plain, request, (int)stopwatch.Elapsed.TotalMilliseconds, fallbackUsed);
+        }
+
         try
         {
             var response = await SendWithRetriesAsync(request, ct);

@@ -79,7 +79,7 @@ Health-порт должен быть свободен. `HttpListener` на `htt
 | `Provider` | `LLM__PROVIDER` | `custom` | `custom` (свой HttpClient) или `meai` (алиас `custom`: единый транспорт, см. `docs/architecture.md`) |
 | `Endpoint` | `LLM__ENDPOINT` | — | Корень OpenAI-совместимого API; клиент сам постит на `/v1/chat/completions` |
 | `ApiKey` | `LLM__APIKEY` | пусто | СЕКРЕТ — только в `.env`. Пусто → заголовок Authorization не добавляется, `-RunNow` упадёт на 401 |
-| `Model` | `LLM__MODEL` | `gpt-4.1-mini` | Модель |
+| `Model` | `LLM__MODEL` | `qwen3.8-omni-flash` | Модель |
 | `MaxTokens` | `LLM__MAXTOKENS` | `4000` | Лимит генерации |
 | `Temperature` | `LLM__TEMPERATURE` | `0.1` | Температура |
 | `TimeoutSeconds` | `LLM__TIMEOUTSECONDS` | `120` | Таймаут запроса |
@@ -177,3 +177,7 @@ Hosted-сервисы (`HealthServer` + планировщик) в режиме 
 `LocalFolderOptions.Exclude`. Секреты в выдаче инструментов режутся `Redactor`.
 Токен GitLab (`GITLAB__TOKEN`) для чата **не требуется** — работа идёт с
 локальными копиями; обязательны `LLM__ENDPOINT` + `LLM__APIKEY`.
+
+Интеграционный тест чата (реальный вызов LLM по сети) включается гейтом
+`CHAT__INTEGRATION=1` и использует те же `LLM__ENDPOINT`/`LLM__APIKEY`;
+по умолчанию тесты имеют статус **Skipped** (см. [`docs/runbook.md`](runbook.md)).

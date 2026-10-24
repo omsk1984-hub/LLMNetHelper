@@ -17,8 +17,8 @@ public sealed class LlmOptions
     /// <summary>API-ключ (по умолчанию пустой — обязателен).</summary>
     public string ApiKey { get; set; } = "";
 
-    /// <summary>Название модели (по умолчанию "gpt-4.1-mini").</summary>
-    public string Model { get; set; } = "gpt-4.1-mini";
+    /// <summary>Название модели (по умолчанию "qwen3.8-omni-flash").</summary>
+    public string Model { get; set; } = "qwen3.8-omni-flash";
 
     /// <summary>Максимальное число токенов в ответе (по умолчанию 4000).</summary>
     public int MaxTokens { get; set; } = 4000;

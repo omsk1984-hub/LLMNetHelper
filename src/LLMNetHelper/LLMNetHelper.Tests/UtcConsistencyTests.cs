@@ -88,7 +88,7 @@ public class UtcConsistencyTests
         Assert.Equal("custom", options.Provider);
         Assert.Equal("", options.Endpoint);
         Assert.Equal("", options.ApiKey);
-        Assert.Equal("gpt-4.1-mini", options.Model);
+        Assert.Equal("qwen3.8-omni-flash", options.Model);
         Assert.Equal(4000, options.MaxTokens);
         Assert.Equal(0.1, options.Temperature);
         Assert.Equal(120, options.TimeoutSeconds);

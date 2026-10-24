@@ -17,7 +17,7 @@ public class LlmContractParityTests
             PromptTokens: 100,
             CompletionTokens: 50,
             FinishReason: "stop",
-            Model: "gpt-4.1-mini",
+            Model: "qwen3.8-omni-flash",
             FallbackUsed: false,
             Duration: TimeSpan.FromSeconds(5));
 
@@ -26,7 +26,7 @@ public class LlmContractParityTests
         Assert.Equal(100, completion.PromptTokens);
         Assert.Equal(50, completion.CompletionTokens);
         Assert.Equal("stop", completion.FinishReason);
-        Assert.Equal("gpt-4.1-mini", completion.Model);
+        Assert.Equal("qwen3.8-omni-flash", completion.Model);
         Assert.False(completion.FallbackUsed);
         Assert.Equal(TimeSpan.FromSeconds(5), completion.Duration);
     }

@@ -15,8 +15,8 @@ public sealed class GitLabOptions
     /// <summary>Разрешено ли использование GitLab-функциональности.</summary>
     public bool Enabled { get; set; }
 
-    /// <summary>Базовый URL GitLab API (по умолчанию "https://gitlab.intellt.ru/api/v4").</summary>
-    public string ApiUrl { get; set; } = "https://gitlab.intellt.ru/api/v4";
+    /// <summary>Базовый URL GitLab API (по умолчанию "https://github.com/omsk1984-hub/ArtasCollector.git").</summary>
+    public string ApiUrl { get; set; } = "https://github.com/omsk1984-hub/ArtasCollector.git";
 
     /// <summary>ID группы в GitLab.</summary>
     public int GroupId { get; set; }

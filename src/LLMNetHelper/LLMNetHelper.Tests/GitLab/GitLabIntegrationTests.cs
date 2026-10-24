@@ -1,4 +1,5 @@
 using LLMNetHelper.GitLab;
+using LLMNetHelper.Tests.TestInfrastructure;
 
 namespace LLMNetHelper.Tests.GitLab;
 
@@ -157,7 +158,7 @@ internal static class GitLabIntegrationEnv
     /// <summary>Необязательный явный путь к <c>.env</c>.</summary>
     public const string EnvFileVariable = "GITLAB__ENVFILE";
 
-    public const string DefaultApiUrl = "https://gitlab.intellt.ru/api/v4";
+    public const string DefaultApiUrl = "https://github.com/omsk1984-hub/ArtasCollector.git";
     public const string DefaultGroupName = "GPM/backend";
 
     private static readonly Lazy<State> _state = new(Resolve);
@@ -234,94 +235,10 @@ internal static class GitLabIntegrationEnv
 
     /// <summary>
     /// Токен: сначала из окружения (его экспортирует <c>run_LLMNetHelper.ps1</c>),
-    /// иначе — из первого найденного <c>.env</c>.
+    /// иначе — из первого найденного <c>.env</c>. Парсер общий для всех
+    /// интеграционных тестов — <see cref="EnvFileReader"/> (план 19).
     /// </summary>
-    private static string? ReadToken()
-    {
-        var fromEnv = Environment.GetEnvironmentVariable(TokenVariable);
-
-        if (!string.IsNullOrWhiteSpace(fromEnv))
-        {
-            return fromEnv.Trim();
-        }
-
-        foreach (var candidate in EnumerateEnvFiles())
-        {
-            var token = ReadValueFromFile(candidate, TokenVariable);
-
-            if (!string.IsNullOrWhiteSpace(token))
-            {
-                return token!.Trim();
-            }
-        }
-
-        return null;
-    }
-
-    /// <summary>
-    /// Каталог <c>.env</c> определяется подъёмом вверх от каталога сборки —
-    /// без жёстко зашитого диска, чтобы тест оставался переносимым.
-    /// </summary>
-    private static IEnumerable<string> EnumerateEnvFiles()
-    {
-        var explicitPath = Environment.GetEnvironmentVariable(EnvFileVariable);
-
-        if (!string.IsNullOrWhiteSpace(explicitPath))
-        {
-            yield return explicitPath;
-        }
-
-        var dir = new DirectoryInfo(AppContext.BaseDirectory);
-
-        for (int level = 0; dir != null && level < 12; level++, dir = dir.Parent)
-        {
-            // Корень репозитория: src/LLMNetHelper/.env
-            yield return Path.Combine(dir.FullName, "src", "LLMNetHelper", ".env");
-            // Каталог самого проекта (вдруг тесты запускаются из него)
-            yield return Path.Combine(dir.FullName, ".env");
-        }
-    }
-
-    /// <summary>
-    /// Примитивный парсер <c>.env</c> — тот же, что в <c>run_LLMNetHelper.ps1</c>:
-    /// <c>KEY=VALUE</c>, разделение по первому <c>=</c>, кавычки обрезаются,
-    /// инлайн-комментарии не поддерживаются.
-    /// </summary>
-    private static string? ReadValueFromFile(string path, string key)
-    {
-        if (!File.Exists(path))
-        {
-            return null;
-        }
-
-        foreach (var rawLine in File.ReadAllLines(path))
-        {
-            var line = rawLine.Trim();
-
-            if (line.Length == 0 || line.StartsWith('#'))
-            {
-                continue;
-            }
-
-            var idx = line.IndexOf('=');
-
-            if (idx <= 0)
-            {
-                continue;
-            }
-
-            var name = line[..idx].Trim();
-
-            if (!string.Equals(name, key, StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
-            return line[(idx + 1)..].Trim().Trim('"').Trim('\'');
-        }
-
-        return null;
-    }
+    private static string? ReadToken() => EnvFileReader.Read(TokenVariable, EnvFileVariable);
 
     private sealed record State(string? SkipReason, GitLabOptions? Options);
 }

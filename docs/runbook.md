@@ -183,3 +183,44 @@ dotnet test src/LLMNetHelper/LLMNetHelper.slnx --filter Category=Integration
 Примечание: фикстура фиксирует TLS 1.2 — TLS 1.3 в локальном SChannel при
 рукопожатии с `gitlab.intellt.ru` падает с `Win32Exception 0x80004005`
 («Не удается установить связь с локальной системой безопасности»).
+
+### Интеграционные тесты чата
+
+`LLMNetHelper.Tests/Chat/ChatIntegrationTests.cs` проверяет режим `-Chat`
+**реальным** вызовом LLM по сети: временный `CloneRoot` с фикстурами →
+BM25-поиск `ChatScope` → промпт → настоящий транспорт
+`CustomOpenAiCompatibleClient`/`CustomLlmChatClient` (через DI-регистрацию
+`AddMonitorAgentLlm`) → ответ `ChatSession`.
+
+Что проверяется:
+
+1. разрешение кредитов из окружения / `.env`;
+2. режим A (`-Ask`): ответ содержит маркер из фикстуры — сквозная проверка
+   поиска, транспорта и промпта;
+3. сужение `/repo other-repo`: маркер из другого репозитория не утекает;
+4. режим B (`/tools`): ReAct-цикл с реальными `repo_search`/`repo_read_file`
+   приходит к тому же маркеру.
+
+Гейт — `CHAT__INTEGRATION=1`; креды — `LLM__ENDPOINT`/`LLM__APIKEY`
+(из окружения или `src/LLMNetHelper/.env`, тот же парсер, что у GitLab).
+Без гейта тесты имеют статус **Skipped** — офлайн-прогон не ломается.
+
+```powershell
+$env:CHAT__INTEGRATION='1'
+dotnet test src/LLMNetHelper/LLMNetHelper.slnx --filter Category=Integration
+```
+
+Примечания:
+
+- Фикстура фиксирует TLS 1.2 для именованного HttpClient `llm` — та же
+  особенность хоста, что у GitLab-интеграции (TLS 1.3 в SChannel падает при
+  рукопожатии).
+- Креды разрешаются в порядке: переменная окружения → `src/LLMNetHelper/.env` →
+  `Llm:*` из `appsettings.json` — то есть тест работает с той же конфигурацией,
+  что и реальный запуск (`LLM__ENDPOINT` может быть не секретом и лежать в
+  `appsettings.json`, ключ — в `.env`).
+- Интеграционный тест выявил и починил дефект транспорта:
+  `CustomOpenAiCompatibleClient` безусловно парсил `ExpectedJsonSchema` —
+  при пустой схеме (свободный ответ чата) запрос падал с
+  «The input does not contain any JSON tokens». Теперь при пустой схеме
+  `response_format` не отправляется вовсе.
