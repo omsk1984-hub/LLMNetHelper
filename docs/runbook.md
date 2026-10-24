@@ -141,6 +141,16 @@ pwsh -NoProfile -Command "[Console]::OutputEncoding=[Text.Encoding]::UTF8; $Outp
   демоном — иначе раннер откажет (код 4): остановите демона `-Stop` или
   задайте другой `AGENT__HEALTHPORT`.
 - Настройки поиска/лимитов — секция `Chat` (см. [`docs/configuration.md`](configuration.md)).
+- **Транскрипт диалога**: весь сеанс пишется в один Markdown-файл
+  `logs\dialogs\chat-<yyyy-MM-dd_HH-mm-ssZ>.md` (время старта — UTC) —
+  вопросы, команды, шаги ReAct-цикла с полными результатами инструментов,
+  полный текст BM25-фрагментов контекста (отключается
+  `CHAT__DIALOGLOG__INCLUDECONTEXTFRAGMENTS=false`), финальные ответы,
+  лимиты/сбои, итоговый футер. Путь — переменная
+  `CHAT__DIALOGLOG__DIRECTORY` (раннер нормализует относительный путь от корня
+  репозитория), отключение — `CHAT__DIALOGLOG__ENABLED=false`. Каталог
+  `logs/*` в `.gitignore`. Подробная таблица параметров —
+  [`docs/configuration.md`](configuration.md#транскрипт-диалога-chatdialoglog).
 - Коды возврата: `0` — сеанс завершён, `1` — сбой LLM/IO/хоста,
   `4` — конфигурация (пустые креды LLM, нет CloneRoot/репозитория, занят порт).
 

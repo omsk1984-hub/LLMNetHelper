@@ -238,6 +238,13 @@ $GitLabGroup     = Get-EnvOr "GITLAB__GROUPNAME" "GPM/backend"
 $AgentLogDir = Join-Path $ReportsDir "logs"
 $PidFile     = Join-Path $AgentLogDir "monitor-agent.pid"
 
+# Каталог Markdown-транскриптов диалогов чата (--chat): один файл на сеанс,
+# logs\dialogs в корне репозитория. Нормализуется до абсолютного и
+# экспортируется в окружение, чтобы процесс приложения писал ровно сюда,
+# независимо от рабочего каталога (как GITLAB__CLONEROOT).
+$DialogLogDir = Resolve-ProjectPath (Get-EnvOr "CHAT__DIALOGLOG__DIRECTORY" (Join-Path $ProjectRoot "logs\dialogs"))
+[System.Environment]::SetEnvironmentVariable("CHAT__DIALOGLOG__DIRECTORY", $DialogLogDir, "Process")
+
 # --- dotnet CLI ------------------------------------------------
 if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) {
     $dotnet = "C:\Program Files\dotnet\dotnet.exe"
@@ -303,6 +310,7 @@ if ($Info) {
     Write-Host "ReportsDir        : $ReportsDir  (существует: $(Test-Path $ReportsDir))"
     Write-Host "DatabasePath      : $DatabasePath"
     Write-Host "Каталог логов     : $AgentLogDir"
+    Write-Host "Транскрипты чата  : $DialogLogDir"
     Write-Host ""
     Write-Host "--- Источники фактов ---" -ForegroundColor Cyan
     Write-Host "Loki              : $LokiUrl"
@@ -583,6 +591,7 @@ if ($Chat) {
     # (Llm:Endpoint). Полную конфигурацию покажет баннер самого чата.
     Write-Host ("[chat] Модель  : " + $(if ($LlmEndpoint) { "$LlmModel @ $LlmEndpoint" } else { "$LlmModel @ <из appsettings.json>" })) -ForegroundColor Cyan
     Write-Host "[chat] Режим   : $(if ($Tools) { 'агентский (/tools, ReAct)' } else { 'поиск контекста (BM25)' })$(if ($Repo) { "; репозиторий $Repo" } else { '' })" -ForegroundColor Cyan
+    Write-Host "[chat] Транскрипт: $DialogLogDir\chat-<UTC-дата-время>.md (Chat:DialogLog)" -ForegroundColor Cyan
     if (-not $Ask) {
         Write-Host "[chat] Команды : /help — справка, /exit — выход. Health: http://localhost:$HealthPort/health" -ForegroundColor DarkGray
     }

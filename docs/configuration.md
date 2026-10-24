@@ -172,11 +172,38 @@ Hosted-сервисы (`HealthServer` + планировщик) в режиме 
 | `MaxSteps` | `CHAT__MAXSTEPS` | `8` | Лимит итераций ReAct (режим `/tools`) |
 | `ToolCallLimit` | `CHAT__TOOLCALLLIMIT` | `30` | Лимит вызовов инструментов за вопрос |
 | `ListLimit` | `CHAT__LISTLIMIT` | `200` | Лимит `repo_list_files` |
+| `DialogLog.Enabled` | `CHAT__DIALOGLOG__ENABLED` | `true` | Писать ли Markdown-транскрипт диалога |
+| `DialogLog.Directory` | `CHAT__DIALOGLOG__DIRECTORY` | `logs/dialogs` | Каталог транскриптов (относительный путь раннер нормализует от корня репозитория) |
+| `DialogLog.IncludeContextFragments` | `CHAT__DIALOGLOG__INCLUDECONTEXTFRAGMENTS` | `true` | Полный текст BM25-фрагментов контекста в транскрипте (`false` — только аннотации) |
 
 Исключения (`bin/obj/node_modules/.git/.env/*.key/…`) наследуются дефолтами
 `LocalFolderOptions.Exclude`. Секреты в выдаче инструментов режутся `Redactor`.
 Токен GitLab (`GITLAB__TOKEN`) для чата **не требуется** — работа идёт с
 локальными копиями; обязательны `LLM__ENDPOINT` + `LLM__APIKEY`.
+
+### Транскрипт диалога (`Chat:DialogLog`)
+
+Каждый сеанс чата пишется в **один Markdown-файл** от запуска до
+`/exit`/EOF: `logs/dialogs/chat-{yyyy-MM-dd_HH-mm-ssZ}.md` (время старта —
+**UTC**; при коллизии имени — суффиксы `-2`, `-3`, …). Фиксируется всё:
+
+- вопросы пользователя и команды (`/repo`, `/tools`, `/clear`, `/exit`, …);
+- в режиме `/tools` — каждый шаг ReAct-цикла: сырой ответ модели
+  (JSON-запрос инструмента), имя и аргументы инструмента, **полный текст**
+  результата, финальный ответ;
+- в режиме BM25 — вопрос, найденные фрагменты контекста и ответ; по умолчанию
+  пишется **полный текст** каждого фрагмента (ровно то, что видела модель,
+  `DialogLog.IncludeContextFragments=true`); при `false` — только аннотации
+  (заголовок, score, длина, путь);
+- пометки о лимитах, сбоях и смене области/режима;
+- футер с итогами сеанса (вопросов/команд, вызовов инструментов).
+
+Файл — UTF-8 без BOM, flush после каждой записи (читаем в процессе сеанса).
+Сбой записи (диск/права) **не рвёт чат**: транскрипт отключается с
+предупреждением в Serilog. Каталог `logs/*` в `.gitignore` — транскрипты
+не попадают в репозиторий. Реализация:
+`LLMNetHelper/Chat/ChatDialogLogger.cs` (`IChatTranscript`,
+`ChatDialogLogger`, `NullChatTranscript`); план — `plans/20_chat-dialog-logging-plan.md`.
 
 Интеграционный тест чата (реальный вызов LLM по сети) включается гейтом
 `CHAT__INTEGRATION=1` и использует те же `LLM__ENDPOINT`/`LLM__APIKEY`;

@@ -56,4 +56,36 @@ public sealed class ChatOptions
 
     /// <summary>Максимум файлов, возвращаемых инструментом <c>repo_list_files</c>.</summary>
     public int ListLimit { get; set; } = 200;
+
+    /// <summary>Markdown-транскрипт диалога (подсекция <c>Chat:DialogLog</c>).</summary>
+    public DialogLogOptions DialogLog { get; set; } = new();
+}
+
+/// <summary>
+/// Параметры транскрипта диалога: один Markdown-файл на весь сеанс чата
+/// (от запуска до <c>/exit</c>/EOF) со всеми вопросами, командами, шагами
+/// ReAct-цикла (ответ модели → вызов инструмента → полный результат) и
+/// финальными ответами. См. <see cref="ChatDialogLogger"/>.
+/// </summary>
+public sealed class DialogLogOptions
+{
+    /// <summary>Писать ли транскрипт (по умолчанию — да).</summary>
+    public bool Enabled { get; set; } = true;
+
+    /// <summary>
+    /// Каталог транскриптов. Относительный путь разрешается от корня
+    /// репозитория раннером (<c>CHAT__DIALOGLOG__DIRECTORY</c>) либо от
+    /// рабочего каталога процесса.
+    /// </summary>
+    public string Directory { get; set; } = "logs/dialogs";
+
+    /// <summary>
+    /// Писать ли в транскрипт ПОЛНЫЙ текст BM25-фрагментов контекста
+    /// (режим без <c>/tools</c>) — ровно то, что видела модель.
+    /// По умолчанию — да; <c>false</c> оставляет только аннотации
+    /// (заголовок, score, длина, путь). Фрагменты ограничены сверху
+    /// параметрами <c>Chat:TopK</c>/<c>Chat:MaxChars</c>/<c>Chat:TotalCharsBudget</c>,
+    /// поэтому размер файла предсказуем.
+    /// </summary>
+    public bool IncludeContextFragments { get; set; } = true;
 }

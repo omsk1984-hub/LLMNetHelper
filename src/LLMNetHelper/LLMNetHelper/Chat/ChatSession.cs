@@ -32,6 +32,7 @@ public sealed class ChatSession
 
     private readonly List<ChatMessage> _history = [];
     private bool _toolsMode;
+    private IChatTranscript _transcript = NullChatTranscript.Instance;
 
     public ChatSession(
         IChatClient chat,
@@ -62,102 +63,137 @@ public sealed class ChatSession
     {
         _toolsMode = tools;
 
-        if (!string.IsNullOrWhiteSpace(repo))
+        // Транскрипт сеанса: один Markdown-файл от старта до /exit/EOF
+        // (Chat:DialogLog). Создаётся до первого действия, закрывается в finally.
+        _transcript = ChatDialogLogger.TryCreate(
+            _options,
+            [("Модель", $"{_llmOptions.Model} @ {_llmOptions.Endpoint}"),
+             ("Область", DescribeScope()),
+             ("Режим на старте", _toolsMode ? "/tools (ReAct)" : "поиск контекста (BM25)")],
+            _loggerFactory.CreateLogger<ChatDialogLogger>());
+
+        try
         {
-            var ok = _scope.TrySetRepo(repo, out var msg);
-            _out.WriteLine($"[chat] {msg}");
-            if (!ok)
+            if (!string.IsNullOrWhiteSpace(repo))
             {
-                return 4;
-            }
-        }
+                var ok = _scope.TrySetRepo(repo, out var msg);
+                _out.WriteLine($"[chat] {msg}");
+                if (!ok)
+                {
+                    _transcript.LogNote($"[команда] --repo={repo}: {msg}");
+                    return 4;
+                }
 
-        if (!string.IsNullOrWhiteSpace(ask))
-        {
-            // Неинтерактивный режим: один вопрос и выход.
-            var answer = await AnswerAsync(ask.Trim(), ct).ConfigureAwait(false);
-            _out.WriteLine(answer);
-            return IsFailure(answer) ? 1 : 0;
-        }
-
-        PrintBanner();
-
-        while (!ct.IsCancellationRequested)
-        {
-            _out.Write("> ");
-            _out.Flush();
-
-            string? line;
-            try
-            {
-                line = _in.ReadLine();
-            }
-            catch (IOException)
-            {
-                // Закрытый stdin (CI/перенаправления) — завершаем сеанс.
-                break;
+                _transcript.LogNote($"[область] {msg}");
             }
 
-            if (line is null)
+            if (!string.IsNullOrWhiteSpace(ask))
             {
-                // EOF (Ctrl+Z / закрытый поток) — выход.
-                _out.WriteLine();
-                break;
+                // Неинтерактивный режим: один вопрос и выход.
+                var answer = await AnswerAsync(ask.Trim(), ct).ConfigureAwait(false);
+                _out.WriteLine(answer);
+                return IsFailure(answer) ? 1 : 0;
             }
 
-            var command = ChatCommandParser.Parse(line);
+            PrintBanner();
 
-            switch (command.Kind)
+            while (!ct.IsCancellationRequested)
             {
-                case ChatCommandKind.Message:
-                    if (string.IsNullOrWhiteSpace(command.Argument))
-                    {
-                        continue;
-                    }
+                _out.Write("> ");
+                _out.Flush();
 
-                    var answer = await AnswerAsync(command.Argument, ct).ConfigureAwait(false);
-                    _out.WriteLine(answer);
+                string? line;
+                try
+                {
+                    line = _in.ReadLine();
+                }
+                catch (IOException)
+                {
+                    // Закрытый stdin (CI/перенаправления) — завершаем сеанс.
+                    break;
+                }
+
+                if (line is null)
+                {
+                    // EOF (Ctrl+Z / закрытый поток) — выход.
                     _out.WriteLine();
                     break;
+                }
 
-                case ChatCommandKind.Help:
-                    PrintHelp();
-                    break;
+                var command = ChatCommandParser.Parse(line);
 
-                case ChatCommandKind.Exit:
-                    _out.WriteLine("[chat] До встречи.");
-                    return 0;
+                switch (command.Kind)
+                {
+                    case ChatCommandKind.Message:
+                        if (string.IsNullOrWhiteSpace(command.Argument))
+                        {
+                            continue;
+                        }
 
-                case ChatCommandKind.Repos:
-                    PrintRepos();
-                    break;
+                        var answer = await AnswerAsync(command.Argument, ct).ConfigureAwait(false);
+                        _out.WriteLine(answer);
+                        _out.WriteLine();
+                        break;
 
-                case ChatCommandKind.Repo:
-                    _scope.TrySetRepo(command.Argument, out var scopeMsg);
-                    _out.WriteLine($"[chat] {scopeMsg}");
-                    break;
+                    case ChatCommandKind.Help:
+                        _transcript.LogCommand(line.Trim());
+                        PrintHelp();
+                        break;
 
-                case ChatCommandKind.Tools:
-                    _toolsMode = !_toolsMode;
-                    _out.WriteLine($"[chat] Режим инструментов: {(_toolsMode ? "включён (ReAct-цикл)" : "выключен (поиск контекста)")}.");
-                    break;
+                    case ChatCommandKind.Exit:
+                        _transcript.LogCommand(line.Trim());
+                        _out.WriteLine("[chat] До встречи.");
+                        return 0;
 
-                case ChatCommandKind.Clear:
-                    _history.Clear();
-                    _out.WriteLine("[chat] История очищена.");
-                    break;
+                    case ChatCommandKind.Repos:
+                        _transcript.LogCommand(line.Trim());
+                        PrintRepos();
+                        break;
 
-                case ChatCommandKind.Status:
-                    PrintStatus();
-                    break;
+                    case ChatCommandKind.Repo:
+                        _scope.TrySetRepo(command.Argument, out var scopeMsg);
+                        _out.WriteLine($"[chat] {scopeMsg}");
+                        _transcript.LogCommand(line.Trim());
+                        _transcript.LogNote($"[область] {scopeMsg}");
+                        break;
 
-                case ChatCommandKind.Unknown:
-                    _out.WriteLine($"[chat] Неизвестная команда: {command.Argument}. Введите /help.");
-                    break;
+                    case ChatCommandKind.Tools:
+                        _toolsMode = !_toolsMode;
+                        _out.WriteLine($"[chat] Режим инструментов: {(_toolsMode ? "включён (ReAct-цикл)" : "выключен (поиск контекста)")}.");
+                        _transcript.LogCommand(line.Trim());
+                        _transcript.LogNote($"[режим] {(_toolsMode ? "/tools (ReAct)" : "поиск контекста (BM25)")}");
+                        break;
+
+                    case ChatCommandKind.Clear:
+                        _history.Clear();
+                        _out.WriteLine("[chat] История очищена.");
+                        _transcript.LogCommand(line.Trim());
+                        _transcript.LogNote("[история] очищена");
+                        break;
+
+                    case ChatCommandKind.Status:
+                        _transcript.LogCommand(line.Trim());
+                        PrintStatus();
+                        break;
+
+                    case ChatCommandKind.Unknown:
+                        _out.WriteLine($"[chat] Неизвестная команда: {command.Argument}. Введите /help.");
+                        _transcript.LogCommand(line.Trim());
+                        break;
+                }
             }
-        }
 
-        return 0;
+            return 0;
+        }
+        finally
+        {
+            if (_transcript is IDisposable disposable)
+            {
+                disposable.Dispose();
+            }
+
+            _transcript = NullChatTranscript.Instance;
+        }
     }
 
     /// <summary>
@@ -174,7 +210,8 @@ public sealed class ChatSession
                     _chat,
                     BuildToolRegistry(),
                     _options,
-                    _loggerFactory.CreateLogger<ChatAgentLoop>());
+                    _loggerFactory.CreateLogger<ChatAgentLoop>(),
+                    _transcript);
 
                 var messages = NewConversation(withTools: true);
                 var answer = await loop.RunAsync(messages, question, ct).ConfigureAwait(false);
@@ -183,7 +220,10 @@ public sealed class ChatSession
             }
 
             // Режим A: BM25-поиск по области → промпт → один ответ.
+            // Вопрос и контекст в транскрипт пишет здесь (в режиме B это делает цикл).
+            _transcript.LogUserMessage(question);
             var search = await _scope.SearchAsync(question, ct).ConfigureAwait(false);
+            _transcript.LogContextDocuments(search.Documents);
 
             var messagesA = NewConversation(withTools: false);
             messagesA.Add(new ChatMessage(ChatRole.User, ChatPromptBuilder.BuildUserPrompt(question, search.Documents)));
@@ -191,6 +231,7 @@ public sealed class ChatSession
             var response = await _chat.GetResponseAsync(messagesA, cancellationToken: ct).ConfigureAwait(false);
             var text = response.Text ?? "[пустой ответ]";
 
+            _transcript.LogAssistantAnswer(text);
             AppendHistory(question, text);
             return text;
         }
@@ -201,6 +242,7 @@ public sealed class ChatSession
         catch (Exception ex)
         {
             _loggerFactory.CreateLogger<ChatSession>().LogError(ex, "Чат: сбой обработки вопроса");
+            _transcript.LogNote($"[Сбой: {ex.Message}]");
             return $"[Сбой: {ex.Message}]";
         }
     }
