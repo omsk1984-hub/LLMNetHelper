@@ -579,7 +579,9 @@ if ($Chat) {
     if ($Tools) { $appArgs += "--tools" }
 
     Write-Host "[chat] Каталог : $GitLabCloneRoot" -ForegroundColor Cyan
-    Write-Host "[chat] Модель  : $LlmModel @ $LlmEndpoint" -ForegroundColor Cyan
+    # Пустой env-endpoint — не ошибка: приложение смёржит appsettings.json
+    # (Llm:Endpoint). Полную конфигурацию покажет баннер самого чата.
+    Write-Host ("[chat] Модель  : " + $(if ($LlmEndpoint) { "$LlmModel @ $LlmEndpoint" } else { "$LlmModel @ <из appsettings.json>" })) -ForegroundColor Cyan
     Write-Host "[chat] Режим   : $(if ($Tools) { 'агентский (/tools, ReAct)' } else { 'поиск контекста (BM25)' })$(if ($Repo) { "; репозиторий $Repo" } else { '' })" -ForegroundColor Cyan
     if (-not $Ask) {
         Write-Host "[chat] Команды : /help — справка, /exit — выход. Health: http://localhost:$HealthPort/health" -ForegroundColor DarkGray
