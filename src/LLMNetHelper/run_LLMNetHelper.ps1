@@ -26,8 +26,9 @@
 # Режим -Chat: интерактивный REPL по вопросам из GitLab:CloneRoot (см. -CloneAll).
 # Hosted-сервисы (health/планировщик) в этом режиме стартуют ВСЕГДА — порт
 # health должен быть свободен (остановите демона: -Stop). Команды чата:
-# /help /exit /repos /repo <имя> /tools /clear /status. Требуется LLM__ENDPOINT
-# и LLM__APIKEY; GITLAB__TOKEN не требуется (работа с локальными копиями).
+# /help /exit /repos /repo <имя> /tools /clear /status. LLM-креды (Endpoint/ApiKey)
+# валидирует само приложение (Program.cs, код возврата 4) по слитной конфигурации
+# appsettings.json + .env; GITLAB__TOKEN не требуется (работа с локальными копиями).
 #
 # УМОЛЧАНИЕ — -DryRun: детерминированный сбор фактов из Loki/Prometheus и
 # snapshot-отчёт БЕЗ обращения к LLM. Это безопасно (не тратит токены, не
@@ -197,6 +198,10 @@ $LlmProvider  = Get-EnvOr "LLM__PROVIDER" "custom"
 $LlmEndpoint  = Get-EnvOr "LLM__ENDPOINT" ""
 $LlmModel     = Get-EnvOr "LLM__MODEL" "qwen3.8-omni-flash"
 $LlmApiKey    = Get-EnvOr "LLM__APIKEY" ""
+# ВАЖНО: $LlmEndpoint/$LlmApiKey здесь — только env-слой, он используется для
+# отображения (-Info/-Chat баннер). Валидация LLM-конфигурации (endpoint/key,
+# включая appsettings.json) перенесена в приложение (Program.cs, код 4) —
+# скрипт НЕ является гейтом для LLM-настроек.
 $RoslynOn     = Get-EnvOr "ROSLYN__ENABLED" "false"
 $ChangeOn     = Get-EnvOr "CODECHANGE__ENABLED" "false"
 $Orchestrator = Get-EnvOr "AGENT__ORCHESTRATION__ORCHESTRATOR" "native"
@@ -303,11 +308,11 @@ if ($Info) {
     Write-Host "Loki              : $LokiUrl"
     Write-Host "Prometheus        : $PromUrl"
     Write-Host ""
-    Write-Host "--- LLM ---" -ForegroundColor Cyan
+    Write-Host "--- LLM (env-слой; приложение дополнительно мержит appsettings.json) ---" -ForegroundColor Cyan
     Write-Host "Provider          : $LlmProvider"
-    Write-Host "Endpoint          : $(if ($LlmEndpoint) { $LlmEndpoint } else { '<пусто> — реальный прогон невозможен' })"
+    Write-Host "Endpoint          : $(if ($LlmEndpoint) { $LlmEndpoint } else { '<в .env не задан — проверит приложение по appsettings.json>' })"
     Write-Host "Model             : $LlmModel"
-    Write-Host "ApiKey            : $(if ($LlmApiKey) { "задан (${($LlmApiKey.Length)} симв.)" } else { '<пусто>' })"
+    Write-Host "ApiKey            : $(if ($LlmApiKey) { "задан (${($LlmApiKey.Length)} симв.)" } else { '<в .env не задан — проверит приложение по appsettings.json>' })"
     Write-Host ""
     Write-Host "--- Агент ---" -ForegroundColor Cyan
     Write-Host "Orchestrator      : $Orchestrator"
@@ -320,7 +325,7 @@ if ($Info) {
     Write-Host "DomainContext     : $(if (Get-EnvOr 'AGENT__ORCHESTRATION__DOMAINCONTEXT' '') { 'задан' } else { '<пусто — нейтральный промпт>' })"
     Write-Host ""
     Write-Host "--- Файлы ---" -ForegroundColor Cyan
-    Write-Host "appsettings.json  : $(if (Test-Path (Join-Path $ScriptDir 'LLMNetHelper\appsettings.json')) { 'есть (переопределит .env-молча)' } else { 'нет — конфигурация только из .env/окружения' })"
+    Write-Host "appsettings.json  : $(if (Test-Path (Join-Path $ScriptDir 'LLMNetHelper\appsettings.json')) { 'есть (валидируется приложением; .env/окружение приоритетнее)' } else { 'нет — конфигурация только из .env/окружения' })"
     Write-Host ".env (агента)     : $(if (Test-Path (Join-Path $ScriptDir '.env')) { 'есть' } else { 'нет — выполните: Copy-Item .env.example .env' })"
     Write-Host ".env (корня)      : $(if (Test-Path (Join-Path $ProjectRoot '.env')) { 'есть' } else { 'нет' })"
     Exit-WithPause 0
@@ -541,16 +546,8 @@ if ($CloneAll -or $ForceClone) {
 if ($Ask -or $Repo -or $Tools) { $Chat = $true }
 
 if ($Chat) {
-    if (-not $LlmEndpoint) {
-        Write-Host "[chat] LLM__ENDPOINT пуст: чат не сможет обратиться к модели." -ForegroundColor Red
-        Write-Host "[chat] Задайте LLM__ENDPOINT/LLM__APIKEY в $ScriptDir\.env" -ForegroundColor DarkGray
-        Exit-WithPause 4
-    }
-    if (-not $LlmApiKey) {
-        Write-Host "[chat] LLM__APIKEY пуст: запрос к $($LlmEndpoint) получит 401." -ForegroundColor Red
-        Write-Host "[chat] Задайте ключ в $ScriptDir\.env" -ForegroundColor DarkGray
-        Exit-WithPause 4
-    }
+    # LLM-креды НЕ проверяем здесь: валидация Endpoint/ApiKey (по слитной
+    # конфигурации appsettings.json + .env) — в приложении, Program.cs (код 4).
     if (-not (Test-Path $GitLabCloneRoot)) {
         Write-Host "[chat] Каталог репозиториев не найден: $GitLabCloneRoot" -ForegroundColor Red
         Write-Host "[chat] Сначала скачайте репозитории: run_LLMNetHelper.ps1 -CloneAll" -ForegroundColor DarkGray
@@ -707,16 +704,8 @@ if ($Daemon) {
 # ===============================================================
 # Валидация конфигурации до запуска (код возврата 4 — «неверная конфигурация»).
 if ($RunNow) {
-    if (-not $LlmEndpoint) {
-        Write-Host "[run] LLM__ENDPOINT пуст: полный прогон (-RunNow) не сможет обратиться к модели." -ForegroundColor Red
-        Write-Host "[run] Задайте LLM__ENDPOINT/LLM__APIKEY в $ScriptDir\.env или используйте -DryRun." -ForegroundColor DarkGray
-        Exit-WithPause 4
-    }
-    if (-not $LlmApiKey) {
-        Write-Host "[run] LLM__APIKEY пуст: запрос к $($LlmEndpoint) получит 401." -ForegroundColor Red
-        Write-Host "[run] Задайте ключ в $ScriptDir\.env или используйте -DryRun (LLM не вызывается)." -ForegroundColor DarkGray
-        Exit-WithPause 4
-    }
+    # LLM-креды НЕ проверяем здесь: валидация Endpoint/ApiKey (по слитной
+    # конфигурации appsettings.json + .env) — в приложении, Program.cs (код 4).
     if ($Orchestrator -eq "semantic-kernel") {
         Write-Host "[run] Orchestrator=semantic-kernel требует AddSemanticKernelOrchestrator() в DependencyInjection.cs" -ForegroundColor Red
         Write-Host "[run] (сейчас не вызывается — см. README). Используйте AGENT__ORCHESTRATION__ORCHESTRATOR=native." -ForegroundColor DarkGray

@@ -81,6 +81,22 @@ internal static class Program
                     ? "[INFO] Dry-run: собираем факты и сводку, LLM не вызывается"
                     : "[INFO] Запуск по команде --run-now...");
 
+                // Fail-fast конфигурации LLM (только реальный прогон: DryRun
+                // модель не вызывает). Источник истины — слитная конфигурация
+                // приложения (appsettings.json + окружение), поэтому предпроверка
+                // живёт здесь, а не в run_LLMNetHelper.ps1.
+                if (!dryRun)
+                {
+                    var llm = host.Services.GetRequiredService<IOptions<LlmOptions>>().Value;
+                    if (string.IsNullOrWhiteSpace(llm.Endpoint) || string.IsNullOrWhiteSpace(llm.ApiKey))
+                    {
+                        Console.WriteLine("[ERROR] Llm:Endpoint / Llm:ApiKey пустые — прогон не сможет обратиться к модели.");
+                        Console.WriteLine("[HINT]  Задайте LLM__ENDPOINT/LLM__APIKEY в src/LLMNetHelper/.env или Llm:Endpoint/Llm:ApiKey в appsettings.json.");
+                        Console.WriteLine("[HINT]  Либо используйте --dry-run (LLM не вызывается).");
+                        return 4;
+                    }
+                }
+
                 var agentRunner = host.Services.GetRequiredService<IAgentRunner>();
 
                 // Инициализация хранилища (WAL + миграции) обязательна ДО первого прогона.
@@ -146,7 +162,7 @@ internal static class Program
         if (string.IsNullOrWhiteSpace(llmOptions.Endpoint) || string.IsNullOrWhiteSpace(llmOptions.ApiKey))
         {
             Console.WriteLine("[ERROR] Llm:Endpoint / Llm:ApiKey пустые — чат не сможет обратиться к модели.");
-            Console.WriteLine("[HINT]  Задайте LLM__ENDPOINT и LLM__APIKEY в src/LLMNetHelper/.env.");
+            Console.WriteLine("[HINT]  Задайте LLM__ENDPOINT/LLM__APIKEY в src/LLMNetHelper/.env или Llm:Endpoint/Llm:ApiKey в appsettings.json.");
             return 4;
         }
 
