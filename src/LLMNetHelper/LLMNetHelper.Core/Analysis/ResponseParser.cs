@@ -132,40 +132,43 @@ public static class ResponseParser
     /// Необъектный элемент даёт пустую находку без исключения — оркестратор
     /// обязан возвращать UNKNOWN, а не падать.
     /// </summary>
+    // План 22, этап 1.7: Finding — record с init-свойствами, поэтому маппинг
+    // собирается одним выражением (промежуточная мутация недопустима).
     public static Finding ParseFinding(JsonElement findingElem)
     {
-        var finding = new Finding();
-
         if (findingElem.ValueKind != JsonValueKind.Object)
         {
-            return finding;
+            return new Finding();
         }
 
-        if (findingElem.TryGetProperty("id", out var idProp) && idProp.ValueKind == JsonValueKind.String)
-            finding.Id = idProp.GetString() ?? "";
-        // План 22, этап 1.4: severity/confidence — перечисления; нераспознанное
-        // значение сохраняется как Other с исходной строкой.
-        if (findingElem.TryGetProperty("severity", out var sevProp) && sevProp.ValueKind == JsonValueKind.String)
-        {
-            finding.Severity = FindingFormat.ParseSeverity(sevProp.GetString(), out var rawSeverity);
-            finding.RawSeverity = rawSeverity;
-        }
-        if (findingElem.TryGetProperty("title", out var titleProp) && titleProp.ValueKind == JsonValueKind.String)
-            finding.Title = titleProp.GetString() ?? "";
-        if (findingElem.TryGetProperty("evidence", out var evProp) && evProp.ValueKind == JsonValueKind.String)
-            finding.Evidence = evProp.GetString() ?? "";
-        if (findingElem.TryGetProperty("impact", out var impProp) && impProp.ValueKind == JsonValueKind.String)
-            finding.Impact = impProp.GetString() ?? "";
-        if (findingElem.TryGetProperty("recommendation", out var recProp) && recProp.ValueKind == JsonValueKind.String)
-            finding.Recommendation = recProp.GetString() ?? "";
-        if (findingElem.TryGetProperty("confidence", out var confProp) && confProp.ValueKind == JsonValueKind.String)
-        {
-            finding.Confidence = FindingFormat.ParseConfidence(confProp.GetString(), out var rawConfidence);
-            finding.RawConfidence = rawConfidence;
-        }
+        var id = ReadString(findingElem, "id") ?? "";
+        var severityWire = ReadString(findingElem, "severity");
+        var severity = FindingFormat.ParseSeverity(severityWire, out var rawSeverity);
+        var title = ReadString(findingElem, "title") ?? "";
+        var evidence = ReadString(findingElem, "evidence") ?? "";
+        var impact = ReadString(findingElem, "impact") ?? "";
+        var recommendation = ReadString(findingElem, "recommendation") ?? "";
+        var confidenceWire = ReadString(findingElem, "confidence");
+        var confidence = FindingFormat.ParseConfidence(confidenceWire, out var rawConfidence);
 
-        return finding;
+        return new Finding
+        {
+            Id = id,
+            Severity = severity,
+            RawSeverity = rawSeverity,
+            Title = title,
+            Evidence = evidence,
+            Impact = impact,
+            Recommendation = recommendation,
+            Confidence = confidence,
+            RawConfidence = rawConfidence
+        };
     }
+
+    private static string? ReadString(JsonElement element, string property) =>
+        element.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.String
+            ? value.GetString()
+            : null;
 
     private static string? ExtractJsonBlock(string text)
     {

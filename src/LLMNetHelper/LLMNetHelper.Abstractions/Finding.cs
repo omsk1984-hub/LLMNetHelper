@@ -130,19 +130,21 @@ public static class FindingFormat
 /// <see cref="RawSeverity"/>/<see cref="RawConfidence"/>.
 /// </para>
 /// </summary>
-public sealed class Finding
+// План 22, этап 1.7: record с init-свойствами — неизменяемая модель контрактного
+// слоя (value equality; мутация после создания невозможна на уровне компиляции).
+public sealed record Finding
 {
-    public string Id { get; set; } = "";
-    public FindingSeverity Severity { get; set; } = FindingSeverity.Info;
-    public string Title { get; set; } = "";
-    public string Evidence { get; set; } = "";
-    public string Impact { get; set; } = "";
-    public string Recommendation { get; set; } = "";
-    public Confidence Confidence { get; set; } = Confidence.Low;
+    public string Id { get; init; } = "";
+    public FindingSeverity Severity { get; init; } = FindingSeverity.Info;
+    public string Title { get; init; } = "";
+    public string Evidence { get; init; } = "";
+    public string Impact { get; init; } = "";
+    public string Recommendation { get; init; } = "";
+    public Confidence Confidence { get; init; } = Confidence.Low;
 
     /// <summary>Исходная строка severity, если значение не распознано (<see cref="FindingSeverity.Other"/>).</summary>
-    public string? RawSeverity { get; set; }
+    public string? RawSeverity { get; init; }
 
     /// <summary>Исходная строка confidence, если значение не распознано (<see cref="Confidence.Other"/>).</summary>
-    public string? RawConfidence { get; set; }
+    public string? RawConfidence { get; init; }
 }
