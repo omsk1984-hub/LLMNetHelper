@@ -270,19 +270,22 @@ flowchart LR
   health-сервера не роняет остановку хоста при сбое слушателя (N1);
   HTTP-ответы и JSON-документы освобождаются на всех путях (N2/N3).
 
-### Этап 1 — Типобезопасность домена
+### Этап 1 — Типобезопасность домена — ЗАВЕРШЁН 2026-10-25
 
 **Цель:** исключить классы ошибок строковых контрактов.
 
-| # | Изменение |
-|---|---|
-| 1.1 | `enum Verdict` (Ok, Warning, Critical, Unknown) вместо строк; сериализация в отчётах и БД — прежние строки через конвертер. Точки: [`Diagnosis`](src/LLMNetHelper/LLMNetHelper.Abstractions/AgentModels.cs:68), [`AnalysisResult`](src/LLMNetHelper/LLMNetHelper.Core/Analysis/ResponseParser.cs:11), [`AgentRunner`](src/LLMNetHelper/LLMNetHelper/AgentRunner.cs:114), [`PlanFixStep`](src/LLMNetHelper/LLMNetHelper/Running/PlanFixStep.cs:32), [`CorrectVerdict`](src/LLMNetHelper/LLMNetHelper.Core/Analysis/ResponseParser.cs:199), [`GetVerdictEmoji`](src/LLMNetHelper/LLMNetHelper.Core/Reporting/MarkdownReportRenderer.cs:232) |
-| 1.2 | `enum RunStatus` (Ok, Partial, Failed) для [`FinishRunAsync`](src/LLMNetHelper/LLMNetHelper.Abstractions/IFactStore.cs:21) и [`RunInfo.Status`](src/LLMNetHelper/LLMNetHelper.Abstractions/Models.cs:63) |
-| 1.3 | `enum ChangeKind` (ReplaceMethodBody, InsertNullCheck) вместо [`ProposedChange.ChangeKind : string`](src/LLMNetHelper/LLMNetHelper.Abstractions/AgentModels.cs:31); парсинг строки из LLM — в одном месте |
-| 1.4 | `enum` для severity/confidence находок и гипотез: [`Finding.Severity/Confidence`](src/LLMNetHelper/LLMNetHelper.Abstractions/Finding.cs:15), [`Hypothesis.Confidence`](src/LLMNetHelper/LLMNetHelper.Abstractions/AgentModels.cs:12); сравнения в [`CorrectVerdict`](src/LLMNetHelper/LLMNetHelper.Core/Analysis/ResponseParser.cs:201) — по enum |
-| 1.5 | [`CreateRunAsync(DateTime, DateTime)`](src/LLMNetHelper/LLMNetHelper.Abstractions/IFactStore.cs:16) — UTC `DateTime` вместо строк; конвертация в текст SQLite — внутри хранилища. Метки времени в [`Models.cs`](src/LLMNetHelper/LLMNetHelper.Abstractions/Models.cs:6) (`BucketStart`, `FirstSeen`, `LastSeen`, `StartedAt`…) → `DateTime` |
-| 1.6 | Типизированные модели вместо `Dictionary<string, object>`: [`ILokiClient.QueryEntriesAsync`](src/LLMNetHelper/LLMNetHelper.Abstractions/ILokiClient.cs:23) → record `LokiEntry`; [`IPrometheusClient.GetAlertingRulesAsync/GetAlertsAsync`](src/LLMNetHelper/LLMNetHelper.Abstractions/IPrometheusClient.cs:16) → record-модели правил и алертов |
-| 1.7 | Immutable-модели в контрактном слое: [`Finding`](src/LLMNetHelper/LLMNetHelper.Abstractions/Finding.cs:12) → record с `init`; классы [`Models.cs`](src/LLMNetHelper/LLMNetHelper.Abstractions/Models.cs) → record/`init`-свойства (с учётом 1.5) |
+Детальная разбивка с blast radius — [`plans/22a_stage1_breakdown.md`](plans/22a_stage1_breakdown.md).
+Фактический порядок выполнения (согласован с пользователем): 1.4 → 1.1 → 1.2 → 1.3 → 1.6 → 1.5 → 1.7.
+
+| # | Изменение | Статус |
+|---|---|---|
+| 1.1 | `enum Verdict` (Ok, Warning, Critical, Unknown) вместо строк; сериализация в отчётах и БД — прежние строки через конвертер `VerdictFormat` | [x] коммит `109fa2c`, тесты `VerdictEnumTests` (11) |
+| 1.2 | `enum RunStatus` (InProgress, Ok, Partial, Failed) для [`FinishRunAsync`](src/LLMNetHelper/LLMNetHelper.Abstractions/IFactStore.cs:21) и [`RunInfo.Status`](src/LLMNetHelper/LLMNetHelper.Abstractions/Models.cs:63); конвертер `RunStatusFormat` | [x] коммит `27562f8` |
+| 1.3 | `enum ChangeKind` (ReplaceMethodBody, InsertNullCheck, Unknown) вместо [`ProposedChange.ChangeKind : string`](src/LLMNetHelper/LLMNetHelper.Abstractions/AgentModels.cs:31); парсинг строки из LLM — в `ChangeKindFormat`; нераспознанный вид пропускает правку (прежнее поведение) | [x] коммит `870004a`, тесты `ChangeKindEnumTests` (10) |
+| 1.4 | `enum FindingSeverity`/`Confidence` с вариантом `Other` + исходная строка в `RawSeverity`/`RawConfidence` (решение пользователя: не терять сигнал); сравнения в `CorrectVerdict` — по enum | [x] коммит `16f7fd0`, тесты `SeverityConfidenceEnumTests` (13) |
+| 1.5 | [`CreateRunAsync(DateTime, DateTime)`](src/LLMNetHelper/LLMNetHelper.Abstractions/IFactStore.cs:16) — UTC `DateTime` вместо строк; метки времени в моделях (`BucketStart`, `FirstSeen`, `LastSeen`, `StartedAt`, `WindowFrom/To`…) → `DateTime`; конвертация ISO-8601 («o») — внутри `SqliteFactStore`; парсинг наносекунд Loki — `ParseLokiTimestamp` с fallback на `MinValue` | [x] коммит `10dfcb9`, тесты `DateTimeRoundTripTests` (3) |
+| 1.6 | Типизированные модели: `LokiEntry` ([`QueryEntriesAsync`](src/LLMNetHelper/LLMNetHelper.Abstractions/ILokiClient.cs:23)), `PrometheusAlert` ([`GetAlertsAsync`](src/LLMNetHelper/LLMNetHelper.Abstractions/IPrometheusClient.cs:19)); **мёртвый `GetAlertingRulesAsync` удалён** (0 потребителей, подтверждено `analyze_change_impact`); internal-конструкторы клиентов с `HttpMessageHandler` для офлайн-тестов | [x] коммит `89c31bb`, тесты `MonitoringTypedModelsTests` (3) |
+| 1.7 | Immutable-модели контрактного слоя: [`Finding`](src/LLMNetHelper/LLMNetHelper.Abstractions/Finding.cs:12) и классы [`Models.cs`](src/LLMNetHelper/LLMNetHelper.Abstractions/Models.cs) → `sealed record` с `init`-свойствами (value equality); `ParseFinding` переписан на сборку одним выражением | [x] коммит `041279a`, тесты `ImmutableModelsTests` (6) |
 
 **Затронутые области:** Abstractions, Core, Agent, Running, Infrastructure, CodeChange, тесты.
 
@@ -294,6 +297,21 @@ flowchart LR
 
 **Риски:** средние — много точек использования строк; мигрировать послойно,
 начиная с Abstractions.
+
+**Итог этапа (2026-10-25):**
+- Тесты: `dotnet test src/LLMNetHelper/LLMNetHelper.slnx` → **353 пройдено,
+  10 пропущено (Integration, корректно Skipped), 0 падений**;
+  SK-паритет → 8/8.
+- `get_diagnostics` (Warning) → 0.
+- Новых тестов: 46 (1.4 ×13, 1.1 ×11, 1.3 ×10, 1.6 ×3, 1.5 ×3, 1.7 ×6).
+- Wire-формат сохранён: строки вердиктов/статусов/severity в отчётах и БД
+  не изменились (конвертеры `VerdictFormat`, `RunStatusFormat`,
+  `FindingFormat`, `ChangeKindFormat` — единственные точки строковых литералов);
+  формат дат в SQLite — прежний ISO-8601 («o»), конвертация внутри хранилища.
+- Удалён мёртвый код: `IPrometheusClient.GetAlertingRulesAsync` (+ реализация).
+- Поведение: нераспознанные severity/confidence сохраняются как `Other` с
+  исходной строкой (не теряются); нераспознанный `change_kind` пропускает
+  правку — как раньше.
 
 ### Этап 2 — Интерфейсы и DIP
 
