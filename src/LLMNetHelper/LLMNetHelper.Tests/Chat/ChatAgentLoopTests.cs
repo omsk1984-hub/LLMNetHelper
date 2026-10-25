@@ -197,24 +197,4 @@ public class ChatAgentLoopTests
         {
         }
     }
-
-    [Theory]
-    [InlineData("""{"tool":"repo_search","arguments":{"query":"x"}}""", "repo_search")]
-    [InlineData("```json\n{\"tool\":\"repo_read_file\",\"arguments\":{\"path\":\"a.cs\"}}\n```", "repo_read_file")]
-    [InlineData("""{"tool":"repo_search","arguments":"{\"query\":\"x\"}"}""", "repo_search")]
-    public void TryParseToolCall_ValidForms(string text, string expectedTool)
-    {
-        Assert.True(ChatAgentLoop.TryParseToolCall(text, out var name, out var args));
-        Assert.Equal(expectedTool, name);
-        Assert.False(string.IsNullOrWhiteSpace(args));
-    }
-
-    [Theory]
-    [InlineData("Обычный текст без JSON")]
-    [InlineData("[1, 2, 3]")]
-    [InlineData("{broken")]
-    public void TryParseToolCall_InvalidForms_ReturnsFalse(string text)
-    {
-        Assert.False(ChatAgentLoop.TryParseToolCall(text, out _, out _));
-    }
 }

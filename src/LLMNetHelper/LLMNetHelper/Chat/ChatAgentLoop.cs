@@ -1,6 +1,6 @@
-using System.Text.Json;
 using LLMNetHelper.Abstractions;
 using LLMNetHelper.Agent.Tools;
+using LLMNetHelper.Core.Analysis;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 
@@ -93,7 +93,7 @@ public sealed class ChatAgentLoop
                 return "[Модель вернула пустой ответ]";
             }
 
-            if (!TryParseToolCall(responseText, out var toolName, out var toolArgs))
+            if (!ToolCallParser.TryParse(responseText, out var toolName, out var toolArgs))
             {
                 // Финальный ответ текстом.
                 _transcript.LogAssistantAnswer(responseText, inputTokens, outputTokens);
@@ -163,70 +163,4 @@ public sealed class ChatAgentLoop
         }
     }
 
-    /// <summary>
-    /// Разбор запроса на вызов инструмента (тот же формат, что у оркестратора):
-    /// <c>{"tool":"repo_search","arguments":{"query":"..."}}</c>.
-    /// </summary>
-    internal static bool TryParseToolCall(string text, out string toolName, out string argumentsJson)
-    {
-        toolName = "";
-        argumentsJson = "{}";
-
-        var json = ExtractJson(text);
-        if (json is null)
-        {
-            return false;
-        }
-
-        try
-        {
-            using var doc = JsonDocument.Parse(json);
-            var root = doc.RootElement;
-
-            if (!root.TryGetProperty("tool", out var toolProp) || toolProp.ValueKind != JsonValueKind.String)
-            {
-                return false;
-            }
-
-            toolName = toolProp.GetString() ?? "";
-            if (string.IsNullOrWhiteSpace(toolName))
-            {
-                return false;
-            }
-
-            if (root.TryGetProperty("arguments", out var args))
-            {
-                argumentsJson = args.ValueKind switch
-                {
-                    JsonValueKind.String => args.GetString() ?? "{}",
-                    JsonValueKind.Object => args.GetRawText(),
-                    _ => "{}"
-                };
-            }
-
-            return true;
-        }
-        catch (JsonException)
-        {
-            return false;
-        }
-    }
-
-    /// <summary>Извлекает JSON-объект из ответа модели (убирает markdown-обёртку).</summary>
-    internal static string? ExtractJson(string text)
-    {
-        var start = text.IndexOf('{');
-        if (start < 0)
-        {
-            return null;
-        }
-
-        var end = text.LastIndexOf('}');
-        if (end <= start)
-        {
-            return null;
-        }
-
-        return text[start..(end + 1)];
-    }
 }

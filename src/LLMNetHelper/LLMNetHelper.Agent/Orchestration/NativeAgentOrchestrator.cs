@@ -134,7 +134,7 @@ public sealed class NativeAgentOrchestrator : IAgentOrchestrator
             }
 
             // Иначе — ищем запрос на вызов инструмента.
-            if (!TryParseToolCall(responseText, out var toolName, out var toolArgs))
+            if (!ToolCallParser.TryParse(responseText, out var toolName, out var toolArgs))
             {
                 // Модель ответила текстом без JSON — это финальный ответ в свободной форме.
                 return FallbackDiagnosis(responseText, toolCalls, promptTokens, completionTokens);
@@ -231,7 +231,7 @@ public sealed class NativeAgentOrchestrator : IAgentOrchestrator
     {
         diagnosis = null;
 
-        var json = ExtractJson(text);
+        var json = JsonText.Extract(text);
         if (json is null)
         {
             return false;
@@ -334,57 +334,12 @@ public sealed class NativeAgentOrchestrator : IAgentOrchestrator
     /// <c>{"tool":"docs_search","arguments":{"query":"..."}}</c>
     /// либо <c>{"tool":"docs_search","arguments":"{\"query\":\"...\"}"}</c>
     /// </summary>
-    private static bool TryParseToolCall(string text, out string toolName, out string argumentsJson)
-    {
-        toolName = "";
-        argumentsJson = "{}";
-
-        var json = ExtractJson(text);
-        if (json is null)
-        {
-            return false;
-        }
-
-        try
-        {
-            using var doc = JsonDocument.Parse(json);
-            var root = doc.RootElement;
-
-            if (!root.TryGetProperty("tool", out var toolProp) || toolProp.ValueKind != JsonValueKind.String)
-            {
-                return false;
-            }
-
-            toolName = toolProp.GetString() ?? "";
-            if (string.IsNullOrWhiteSpace(toolName))
-            {
-                return false;
-            }
-
-            if (root.TryGetProperty("arguments", out var args))
-            {
-                argumentsJson = args.ValueKind switch
-                {
-                    JsonValueKind.String => args.GetString() ?? "{}",
-                    JsonValueKind.Object => args.GetRawText(),
-                    _ => "{}"
-                };
-            }
-
-            return true;
-        }
-        catch (JsonException)
-        {
-            return false;
-        }
-    }
-
     /// <summary>
     /// Разбор плана правки.
     /// </summary>
     private static FixPlan? TryParseFixPlan(string text)
     {
-        var json = ExtractJson(text);
+        var json = JsonText.Extract(text);
         if (json is null)
         {
             return null;
@@ -446,26 +401,6 @@ public sealed class NativeAgentOrchestrator : IAgentOrchestrator
         {
             return null;
         }
-    }
-
-    /// <summary>
-    /// Извлекает JSON-объект из ответа модели: убирает markdown-обёртку.
-    /// </summary>
-    private static string? ExtractJson(string text)
-    {
-        var start = text.IndexOf('{');
-        if (start < 0)
-        {
-            return null;
-        }
-
-        var end = text.LastIndexOf('}');
-        if (end <= start)
-        {
-            return null;
-        }
-
-        return text[start..(end + 1)];
     }
 
     private static string GetString(JsonElement element, string property, string fallback)
