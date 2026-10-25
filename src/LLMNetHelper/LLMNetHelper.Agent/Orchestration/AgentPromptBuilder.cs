@@ -4,7 +4,8 @@ using LLMNetHelper.Abstractions;
 namespace LLMNetHelper.Agent.Orchestration;
 
 /// <summary>
-/// Сборка промптов агента.
+/// Сборка промптов агента (план 22, этап 6.1: экземплярный класс, реализующий
+/// <see cref="IAgentPromptBuilder"/> — подменяемость в тестах и версионирование).
 /// Промпты детерминированы и версионируются вместе с кодом — это требование
 /// воспроизводимости ночного прогона.
 /// <para>
@@ -14,7 +15,7 @@ namespace LLMNetHelper.Agent.Orchestration;
 /// гипотезы только на фактах из сводки и документации.
 /// </para>
 /// </summary>
-public static class AgentPromptBuilder
+public sealed class AgentPromptBuilder : IAgentPromptBuilder
 {
     /// <summary>
     /// Нейтральное доменное описание, используемое когда DomainContext не задан.
@@ -27,7 +28,7 @@ public static class AgentPromptBuilder
     /// <summary>
     /// Системный промпт: роль, доменный контекст, правила проекта, формат ответа.
     /// </summary>
-    public static string BuildSystemPrompt(string toolDescriptions, string? domainContext = null)
+    public string BuildSystemPrompt(string toolDescriptions, string? domainContext = null)
     {
         var sb = new StringBuilder();
 
@@ -77,7 +78,7 @@ public static class AgentPromptBuilder
     /// <summary>
     /// Пользовательский промпт: контекст прогона.
     /// </summary>
-    public static string BuildUserPrompt(AgentContext context)
+    public string BuildUserPrompt(AgentContext context)
     {
         var sb = new StringBuilder();
 
@@ -115,7 +116,7 @@ public static class AgentPromptBuilder
     /// <summary>
     /// Промпт для этапа планирования правки.
     /// </summary>
-    public static string BuildPlanPrompt(Diagnosis diagnosis, AgentContext context)
+    public string BuildPlanPrompt(Diagnosis diagnosis, AgentContext context)
     {
         var sb = new StringBuilder();
 

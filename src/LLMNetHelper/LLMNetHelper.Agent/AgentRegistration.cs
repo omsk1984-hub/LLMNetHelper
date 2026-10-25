@@ -15,6 +15,10 @@ public static class AgentRegistration
     /// </summary>
     public static IServiceCollection AddAgentTools(this IServiceCollection services)
     {
+        // План 22, этап 6.1: промпты агента — экземплярный сервис по интерфейсу
+        // (подмена в тестах, версионирование).
+        services.AddSingleton<IAgentPromptBuilder, AgentPromptBuilder>();
+
         services.AddSingleton<IAgentTool, DocsSearchTool>();
         services.AddSingleton<IAgentTool, CodeSearchTool>();
         services.AddSingleton<IAgentTool, CodeReadTool>();

@@ -517,10 +517,13 @@ public class ToolRegistryTests
 /// </summary>
 public class AgentPromptBuilderTests
 {
+    // План 22, этап 6.1: AgentPromptBuilder — экземплярный класс (IAgentPromptBuilder).
+    private static readonly AgentPromptBuilder Builder = new();
+
     [Fact]
     public void SystemPrompt_NoDomainContext_UsesNeutralText()
     {
-        var prompt = AgentPromptBuilder.BuildSystemPrompt("- tool: desc");
+        var prompt = Builder.BuildSystemPrompt("- tool: desc");
 
         Assert.Contains(AgentPromptBuilder.NeutralDomainContext, prompt);
         // Ни одного упоминания домена конкретного развёртывания.
@@ -534,7 +537,7 @@ public class AgentPromptBuilderTests
     {
         const string domain = "Система — торговый терминал: поток котировок → PostgreSQL, логи в Loki.";
 
-        var prompt = AgentPromptBuilder.BuildSystemPrompt("- tool: desc", domain);
+        var prompt = Builder.BuildSystemPrompt("- tool: desc", domain);
 
         Assert.Contains("## Анализируемая система", prompt);
         Assert.Contains(domain, prompt);
@@ -544,7 +547,7 @@ public class AgentPromptBuilderTests
     [Fact]
     public void SystemPrompt_WhitespaceDomainContext_TreatedAsUnset()
     {
-        var prompt = AgentPromptBuilder.BuildSystemPrompt("- tool: desc", "   \n  ");
+        var prompt = Builder.BuildSystemPrompt("- tool: desc", "   \n  ");
 
         Assert.Contains(AgentPromptBuilder.NeutralDomainContext, prompt);
     }

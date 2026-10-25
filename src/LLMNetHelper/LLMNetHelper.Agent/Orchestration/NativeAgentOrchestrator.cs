@@ -37,19 +37,23 @@ public sealed class NativeAgentOrchestrator : IAgentOrchestrator
     private readonly IToolInvoker _invoker;
     private readonly AgentOrchestrationOptions _options;
     private readonly ILogger<NativeAgentOrchestrator> _logger;
+    // План 22, этап 6.1: промпты через абстракцию (подменяемость, версионирование).
+    private readonly IAgentPromptBuilder _promptBuilder;
 
     public NativeAgentOrchestrator(
         IChatClient chat,
         IToolCatalog catalog,
         IToolInvoker invoker,
         AgentOrchestrationOptions options,
-        ILogger<NativeAgentOrchestrator> logger)
+        ILogger<NativeAgentOrchestrator> logger,
+        IAgentPromptBuilder? promptBuilder = null)
     {
         _chat = chat;
         _catalog = catalog;
         _invoker = invoker;
         _options = options;
         _logger = logger;
+        _promptBuilder = promptBuilder ?? new AgentPromptBuilder();
     }
 
     /// <summary>
@@ -60,8 +64,9 @@ public sealed class NativeAgentOrchestrator : IAgentOrchestrator
         IChatClient chat,
         IToolRegistry registry,
         AgentOrchestrationOptions options,
-        ILogger<NativeAgentOrchestrator> logger)
-        : this(chat, registry, registry, options, logger)
+        ILogger<NativeAgentOrchestrator> logger,
+        IAgentPromptBuilder? promptBuilder = null)
+        : this(chat, registry, registry, options, logger, promptBuilder)
     {
     }
 
@@ -77,8 +82,8 @@ public sealed class NativeAgentOrchestrator : IAgentOrchestrator
 
         var messages = new List<ChatMessage>
         {
-            new(ChatRole.System, AgentPromptBuilder.BuildSystemPrompt(toolDescriptions, _options.DomainContext)),
-            new(ChatRole.User, AgentPromptBuilder.BuildUserPrompt(context))
+            new(ChatRole.System, _promptBuilder.BuildSystemPrompt(toolDescriptions, _options.DomainContext)),
+            new(ChatRole.User, _promptBuilder.BuildUserPrompt(context))
         };
 
         var toolCalls = 0;
@@ -176,9 +181,9 @@ public sealed class NativeAgentOrchestrator : IAgentOrchestrator
 
         var messages = new List<ChatMessage>
         {
-            new(ChatRole.System, AgentPromptBuilder.BuildSystemPrompt("(планирование правки)", _options.DomainContext)),
-            new(ChatRole.User, AgentPromptBuilder.BuildUserPrompt(context)),
-            new(ChatRole.User, AgentPromptBuilder.BuildPlanPrompt(diagnosis, context))
+            new(ChatRole.System, _promptBuilder.BuildSystemPrompt("(планирование правки)", _options.DomainContext)),
+            new(ChatRole.User, _promptBuilder.BuildUserPrompt(context)),
+            new(ChatRole.User, _promptBuilder.BuildPlanPrompt(diagnosis, context))
         };
 
         try
