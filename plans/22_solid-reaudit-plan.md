@@ -313,21 +313,21 @@ flowchart LR
   исходной строкой (не теряются); нераспознанный `change_kind` пропускает
   правку — как раньше.
 
-### Этап 2 — Интерфейсы и DIP
+### Этап 2 — Интерфейсы и DIP — ЗАВЕРШЁН 2026-10-25
 
 **Цель:** замены реализаций без правки потребителей; подготовка тестируемости.
 
-| # | Изменение |
-|---|---|
-| 2.1 | `IGitService` из [`GitService`](src/LLMNetHelper/LLMNetHelper.CodeChange/GitService.cs:15); [`ChangeTransaction`](src/LLMNetHelper/LLMNetHelper.CodeChange/ChangeTransaction.cs:93) зависит от интерфейса |
-| 2.2 | `IAstPatcher` из `AstPatcher`; `ICompilationValidator` из `CompilationValidator` |
-| 2.3 | `IGitLabApiClient` из `GitLabApiClient`; [`GitLabService`](src/LLMNetHelper/LLMNetHelper.GitLab/GitLabService.cs:35) зависит от интерфейса |
-| 2.4 | `ISolutionLoader` из `SolutionLoader`; потребители — [`ChatSession`](src/LLMNetHelper/LLMNetHelper/Chat/ChatSession.cs:39), [`ChangeTransaction`](src/LLMNetHelper/LLMNetHelper.CodeChange/ChangeTransaction.cs:90) |
-| 2.5 | `ISnapshotBuilder` из `SnapshotBuilder`; регистрация через интерфейс вместо [`DependencyInjection.cs:82`](src/LLMNetHelper/LLMNetHelper/DependencyInjection.cs:82) |
-| 2.6 | Разделить [`IToolRegistry`](src/LLMNetHelper/LLMNetHelper.Abstractions/IAgentOrchestrator.cs:35): `IToolCatalog` (`Tools`, `Find`, `DescribeForPrompt`) + `IToolInvoker` (`InvokeAsync`). Убрать проверку типа [`_registry is ToolRegistry`](src/LLMNetHelper/LLMNetHelper.Agent/Orchestration/NativeAgentOrchestrator.cs:56) |
-| 2.7 | Сегрегация [`IFactStore`](src/LLMNetHelper/LLMNetHelper.Abstractions/IFactStore.cs:6): `IRunRepository`, `ILogFactRepository`, `IErrorSampleRepository`, `IMetricFactRepository`, `ILlmRunRepository`; `IFactStore` — фасад для постепенной миграции. Убрать `IDisposable` из контракта, `InitializeAsync` — внутренняя деталь реализации |
-| 2.8 | 5 конкретных Roslyn-параметров [`ChatSession`](src/LLMNetHelper/LLMNetHelper/Chat/ChatSession.cs:49) заменить одним `IRoslynToolFactory` (возвращает список `IAgentTool` либо пусто) |
-| 2.9 | [`NightlyScheduleHostedService`](src/LLMNetHelper/LLMNetHelper/Scheduling/NightlyScheduleHostedService.cs:110) — конструкторная инъекция `IGitService` вместо `GetRequiredService<GitService>()` |
+| # | Изменение | Статус |
+|---|---|---|
+| 2.1 | `IGitService` из [`GitService`](src/LLMNetHelper/LLMNetHelper.CodeChange/GitService.cs:15); [`ChangeTransaction`](src/LLMNetHelper/LLMNetHelper.CodeChange/ChangeTransaction.cs:93) зависит от интерфейса | [x] коммит `7e10a60` (совместно с 2.9) |
+| 2.2 | `IAstPatcher` из `AstPatcher`; `ICompilationValidator` из `CompilationValidator` (размещение — проект Roslyn: сигнатуры используют `Solution`/`PatchResult`) | [x] коммит `929f18f` |
+| 2.3 | `IGitLabApiClient` из `GitLabApiClient`; [`GitLabService`](src/LLMNetHelper/LLMNetHelper.GitLab/GitLabService.cs:35) зависит от интерфейса | [x] коммит `7741510` |
+| 2.4 | `ISolutionLoader` из `SolutionLoader`; потребители — [`ChatSession`](src/LLMNetHelper/LLMNetHelper/Chat/ChatSession.cs:39), [`ChangeTransaction`](src/LLMNetHelper/LLMNetHelper.CodeChange/ChangeTransaction.cs:90), Roslyn-сервисы | [x] коммит `5b6f421` |
+| 2.5 | `ISnapshotBuilder` из `SnapshotBuilder`; регистрация через интерфейс | [x] коммит `0978e5f` |
+| 2.6 | Разделить [`IToolRegistry`](src/LLMNetHelper/LLMNetHelper.Abstractions/IAgentOrchestrator.cs:35): `IToolCatalog` (`Tools`, `Find`, `DescribeForPrompt`) + `IToolInvoker` (`InvokeAsync`, `Reset`); `IToolRegistry` — фасад; проверка типа `_registry is ToolRegistry` устранена | [x] коммит `21feec6`, тесты `ToolCatalogSegregationTests` (2) |
+| 2.7 | Сегрегация [`IFactStore`](src/LLMNetHelper/LLMNetHelper.Abstractions/IFactStore.cs:6): `IRunRepository`, `ILogFactRepository`, `IErrorSampleRepository`, `IMetricFactRepository`, `ILlmRunRepository`; `IFactStore` — фасад; `IDisposable` и `InitializeAsync` убраны из контракта (ленивая инициализация в `SqliteFactStore`) | [x] коммит `f6618b1`, тесты `FactStoreSegregationTests` (5) |
+| 2.8 | 5 конкретных Roslyn-параметров [`ChatSession`](src/LLMNetHelper/LLMNetHelper/Chat/ChatSession.cs:49) заменены одним `IRoslynToolFactory` (возвращает список `IAgentTool` либо пусто) | [x] коммит `8077359`, тесты `RoslynToolFactoryTests` (5) |
+| 2.9 | [`NightlyScheduleHostedService`](src/LLMNetHelper/LLMNetHelper/Scheduling/NightlyScheduleHostedService.cs:110) — конструкторная инъекция `IGitService` вместо `GetRequiredService<GitService>()` | [x] коммит `7e10a60` |
 
 **Затронутые области:** все проекты; преимущественно Abstractions + DI-регистрации.
 
@@ -339,6 +339,28 @@ flowchart LR
 
 **Риски:** средние — широкий охват; смягчение: фасад `IFactStore`, миграция
 потребителей по одному.
+
+**Итог этапа (2026-10-25):**
+- Тесты: `dotnet test src/LLMNetHelper/LLMNetHelper.slnx` → **365 пройдено,
+  10 пропущено (Integration, корректно Skipped), 0 падений**;
+  SK-паритет → 8/8.
+- `get_diagnostics` (Warning) → 0.
+- Новых тестов: 12 (2.6 ×2, 2.7 ×5, 2.8 ×5).
+- `find_implementations` по каждому новому интерфейсу даёт 1 реализацию
+  (`IGitService`→`GitService`, `IAstPatcher`→`AstPatcher`,
+  `ICompilationValidator`→`CompilationValidator`, `IGitLabApiClient`→
+  `GitLabApiClient`, `ISolutionLoader`→`SolutionLoader`,
+  `ISnapshotBuilder`→`SnapshotBuilder`, `IRoslynToolFactory`→`RoslynToolFactory`,
+  5 репозиториев→`SqliteFactStore`).
+- Устранены Service Locator: `GetRequiredService<GitService>` в планировщике,
+  `GetService<SolutionLoader>`/`GetRequiredService<GitLabApiClient>` в Program.cs;
+  ручные вызовы `InitializeAsync` (Program.cs, планировщик) удалены —
+  инициализация ленивая внутри `SqliteFactStore`.
+- Устранена проверка типа `_registry is Tools.ToolRegistry` в оркестраторе
+  (OCP/DIP): описание промпта берётся из контракта `IToolCatalog.DescribeForPrompt`.
+- Поведение: нейтральное (чистая реструктуризация контрактов);
+  `IDisposable`/`InitializeAsync` убраны из контрактов — реализации
+  по-прежнему утилизируются DI-контейнером.
 
 ### Этап 3 — Устранение дублирования: единый ReAct-цикл и парсеры
 
