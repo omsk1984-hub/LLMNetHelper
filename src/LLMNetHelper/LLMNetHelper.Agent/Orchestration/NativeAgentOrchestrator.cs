@@ -1,6 +1,5 @@
-using System.Text;
-using System.Text.Json;
 using LLMNetHelper.Abstractions;
+using LLMNetHelper.Agent.AgentLoop;
 using LLMNetHelper.Core.Analysis;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
@@ -71,8 +70,8 @@ public sealed class NativeAgentOrchestrator : IAgentOrchestrator
     /// <inheritdoc />
     public async Task<Diagnosis> DiagnoseAsync(AgentContext context, CancellationToken ct = default)
     {
-        // План 22, этап 2.6: описание берётся из контракта каталога —
-        // проверка типа конкретного ToolRegistry устранена.
+        // План 22, этап 3.5: оркестратор — тонкий адаптер над общим ReAct-движком.
+        // Собственной логики цикла/парсинга здесь больше нет.
         var toolDescriptions = _catalog.DescribeForPrompt();
 
         var messages = new List<ChatMessage>
@@ -81,88 +80,28 @@ public sealed class NativeAgentOrchestrator : IAgentOrchestrator
             new(ChatRole.User, _promptBuilder.BuildUserPrompt(context))
         };
 
-        var toolCalls = 0;
+        var engine = new ReActLoopEngine();
+        var strategy = new DiagnosisReActStrategy(_invoker);
 
-        // Дефект N4 (план 22): накапливаем usage модели по всем вызовам цикла,
-        // чтобы токены доходили до отчёта (раньше терялись между транспортом и рендерером).
-        int? promptTokens = null;
-        int? completionTokens = null;
+        var outcome = await engine.RunAsync(
+            _chat,
+            messages,
+            strategy,
+            new ReActOptions(_options.MaxSteps, _options.ToolCallLimit),
+            new LoggingObserver(_logger),
+            ct).ConfigureAwait(false);
 
-        for (var step = 0; step < _options.MaxSteps; step++)
-        {
-            ct.ThrowIfCancellationRequested();
-
-            string? responseText;
-
-            try
-            {
-                var response = await _chat.GetResponseAsync(messages, cancellationToken: ct).ConfigureAwait(false);
-                responseText = response.Text;
-
-                if (response.Usage is { } usage)
-                {
-                    if (usage.InputTokenCount is { } i)
-                    {
-                        promptTokens = (promptTokens ?? 0) + (int)Math.Min(i, int.MaxValue);
-                    }
-
-                    if (usage.OutputTokenCount is { } o)
-                    {
-                        completionTokens = (completionTokens ?? 0) + (int)Math.Min(o, int.MaxValue);
-                    }
-                }
-            }
-            catch (OperationCanceledException)
-            {
-                throw;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Сбой вызова LLM на шаге {Step}", step);
-                return Unknown($"Сбой LLM: {ex.Message}", toolCalls, promptTokens, completionTokens);
-            }
-
-            if (string.IsNullOrWhiteSpace(responseText))
-            {
-                return Unknown("LLM вернул пустой ответ", toolCalls, promptTokens, completionTokens);
-            }
-
-            // Пытаемся разобрать как финальный JSON.
-            var diagnosis = DiagnosisParser.TryParse(
-                responseText, ProviderName, toolCalls, promptTokens, completionTokens);
-            if (diagnosis is not null)
-            {
-                return diagnosis;
-            }
-
-            // Иначе — ищем запрос на вызов инструмента.
-            if (!ToolCallParser.TryParse(responseText, out var toolName, out var toolArgs))
-            {
-                // Модель ответила текстом без JSON — это финальный ответ в свободной форме.
-                return FallbackDiagnosis(responseText, toolCalls, promptTokens, completionTokens);
-            }
-
-            if (toolCalls >= _options.ToolCallLimit)
-            {
-                _logger.LogWarning("Достигнут лимит вызовов инструментов ({Limit})", _options.ToolCallLimit);
-                return Unknown("Достигнут лимит вызовов инструментов", toolCalls, promptTokens, completionTokens);
-            }
-
-            var record = await _invoker.InvokeAsync(toolName, toolArgs, ct).ConfigureAwait(false);
-            toolCalls++;
-
-            _logger.LogInformation(
-                "Инструмент {Tool}: {Chars} символов за {Ms} мс, успех={Ok}",
-                record.ToolName, record.ResultChars, record.DurationMs, record.Succeeded);
-
-            // Добавляем в историю и ответ модели, и результат инструмента.
-            messages.Add(new ChatMessage(ChatRole.Assistant, responseText));
-            messages.Add(new ChatMessage(ChatRole.User,
-                $"Результат инструмента `{toolName}`:\n{DescribeToolResult(record, toolName)}"));
-        }
-
-        _logger.LogWarning("Достигнут лимит шагов ({Limit})", _options.MaxSteps);
-        return Unknown("Достигнут лимит шагов", toolCalls, promptTokens, completionTokens);
+        return outcome.Diagnosis
+            ?? new Diagnosis(
+                Verdict.Unknown,
+                "Движок не вернул диагноза.",
+                [],
+                [],
+                [],
+                outcome.ToolCalls,
+                ProviderName,
+                outcome.PromptTokens,
+                outcome.CompletionTokens);
     }
 
     /// <inheritdoc />
@@ -207,41 +146,24 @@ public sealed class NativeAgentOrchestrator : IAgentOrchestrator
     }
 
     /// <summary>
-    /// Дополняет результат инструмента, если тот провалился: модель должна
-    /// понимать, что инструмент не сработал, а не думать, что данных нет.
+    /// Наблюдатель событий цикла: сохраняет диагностику вызовов инструмента,
+    /// которая раньше была в теле цикла (план 22, этап 3.5).
     /// </summary>
-    private string DescribeToolResult(ToolCallRecord record, string toolName)
+    private sealed class LoggingObserver(ILogger<NativeAgentOrchestrator> logger) : IReActObserver
     {
-        if (!record.Succeeded)
+        public void OnModelResponse(int? inputTokens, int? outputTokens)
         {
-            return $"Инструмент `{toolName}` не зарегистрирован в белом списке. " +
-                   "Используй только инструменты из системного промпта.";
         }
 
-        return $"успешно, {record.ResultChars} символов";
-    }
+        public void OnToolCall(int step, string toolName, string argumentsJson)
+        {
+        }
 
-    /// <summary>
-    /// Диагноз при неструктурированном ответе модели.
-    /// </summary>
-    private Diagnosis FallbackDiagnosis(string text, int toolCalls, int? promptTokens, int? completionTokens)
-    {
-        var summary = text.Length > 500 ? text[..500] + "…" : text;
-
-        return new Diagnosis(
-            Verdict.Unknown,
-            summary.Trim(),
-            [],
-            [],
-            ["Модель вернула ответ в свободной форме — требуется ручной разбор."],
-            toolCalls,
-            ProviderName,
-            promptTokens,
-            completionTokens);
-    }
-
-    private Diagnosis Unknown(string reason, int toolCalls, int? promptTokens, int? completionTokens)
-    {
-        return new Diagnosis(Verdict.Unknown, reason, [], [], [], toolCalls, ProviderName, promptTokens, completionTokens);
+        public void OnToolResult(int step, string toolName, string resultText, bool succeeded)
+        {
+            logger.LogInformation(
+                "Инструмент {Tool}: {Chars} символов, успех={Ok}",
+                toolName, resultText.Length, succeeded);
+        }
     }
 }
