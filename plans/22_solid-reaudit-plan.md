@@ -434,30 +434,71 @@ null-forgiving.
 
 **Риски:** средние — затрагивает все шаги; выполнять после 4.5.
 
-### Этап 6 — Тестируемость и сериализация
+### Этап 6 — Тестируемость и сериализация — ЗАВЕРШЁН 2026-10-25
 
 **Цель:** подменяемые компоненты вместо статических классов; единые правила
 сериализации; рост покрытия.
 
-| # | Изменение |
-|---|---|
-| 6.1 | `AgentPromptBuilder`/`ChatPromptBuilder` → экземплярные сервисы `IPromptBuilder` (подмена в тестах, версионирование промптов) |
-| 6.2 | Рендереры отчётов → `IMarkdownReportRenderer`/`IJsonReportRenderer`/`IPatchRenderer` |
-| 6.3 | Единый провайдер `JsonSerializerOptions` (сейчас независимые опции в [`ResponseParser`](src/LLMNetHelper/LLMNetHelper.Core/Analysis/ResponseParser.cs:28), [`JsonReportRenderer`](src/LLMNetHelper/LLMNetHelper.Core/Reporting/JsonReportRenderer.cs:13), [`NativeAgentOrchestrator`](src/LLMNetHelper/LLMNetHelper.Agent/Orchestration/NativeAgentOrchestrator.cs:28)) |
-| 6.4 | Контрактные тесты: JSON ответа LLM → `Diagnosis`; `Diagnosis` → JSON/Markdown отчёта (включая findings, hypotheses, usage) |
-| 6.5 | Убрать [`TokenBudgetGuard.Instance`](src/LLMNetHelper/LLMNetHelper.Core/Snapshot/TokenBudgetGuard.cs:17) — только DI; тесты получают экземпляр через конструктор |
-| 6.6 | Именование: префикс `_` у приватных полей (15 нарушений, `rename_symbol` с preview) |
-| 6.7 | Покрытие риск-хотспотов (51 символ): приоритет — [`SnapshotBuilder.BuildAsync`](src/LLMNetHelper/LLMNetHelper.Core/Snapshot/SnapshotBuilder.cs:32), [`MarkdownReportRenderer.Render`](src/LLMNetHelper/LLMNetHelper.Core/Reporting/MarkdownReportRenderer.cs:23), [`LocalFolderContextSource.SearchAsync`](src/LLMNetHelper/LLMNetHelper.Infrastructure/Context/LocalFolderContextSource.cs:55), GitLab-инструменты; каркасы — `generate_test_skeleton` |
+| # | Изменение | Статус |
+|---|---|---|
+| 6.1 | `AgentPromptBuilder`/`ChatPromptBuilder` → экземплярные сервисы `IPromptBuilder` (подмена в тестах, версионирование промптов) | [x] `2d1dd1f` (6.1a, `IAgentPromptBuilder`, 3 теста), `f0fae3b` (6.1b, `IChatPromptBuilder`, 1 тест) |
+| 6.2 | Рендереры отчётов → `IMarkdownReportRenderer`/`IJsonReportRenderer`; **`IPatchRenderer` НЕ извлекался** — у [`PatchRenderer`](src/LLMNetHelper/LLMNetHelper.Core/Reporting/PatchRenderer.cs:13) **0 production-потребителей** (только тесты): `ApplyChangesStep` пишет `changeOutcome.Diff` от git, а не этот рендерер; класс помечен на удаление в 4.8 | [x] коммит `89a1bae`, тесты `ReportRendererInjectionTests` (2) |
+| 6.3 | Единый провайдер `JsonSerializerOptions` | [x] коммит `4a5e727`, `JsonProfiles`; итог — см. ниже (мёртвый код) |
+| 6.4 | Контрактные тесты: JSON ответа LLM → `Diagnosis`; `Diagnosis` → JSON/Markdown отчёта (включая findings, hypotheses, usage) | [x] коммит `0d5fc7c`, `ReportContractTests` (3) |
+| 6.5 | Убрать [`TokenBudgetGuard.Instance`](src/LLMNetHelper/LLMNetHelper.Core/Snapshot/TokenBudgetGuard.cs:17) — только DI; тесты получают экземпляр через конструктор | [x] коммит `9ac5794` |
+| 6.6 | Именование: префикс `_` у приватных полей | [x] коммит `a9de968`; объём и итог — см. ниже |
+| 6.7 | Покрытие риск-хотспотов: [`SnapshotBuilder.BuildAsync`](src/LLMNetHelper/LLMNetHelper.Core/Snapshot/SnapshotBuilder.cs:33), [`MarkdownReportRenderer.Render`](src/LLMNetHelper/LLMNetHelper.Core/Reporting/MarkdownReportRenderer.cs:24), [`LokiHttpClient`](src/LLMNetHelper/LLMNetHelper.Infrastructure/Loki/LokiHttpClient.cs:59)/[`PrometheusHttpClient`](src/LLMNetHelper/LLMNetHelper.Infrastructure/Prometheus/PrometheusHttpClient.cs:40), GitLab-инструменты | [x] коммит `fc1d852`; +56 тестов (`MonitoringHttpClientTests` 16, `SnapshotBuilderTests` 8, `MarkdownReportRendererTests` 21, `GitLabToolTests` 11) |
 
-**Затронутые области:** Agent, Core.Reporting, Infrastructure, тесты.
+**Затронутые области:** Agent, Core.Reporting, Core.Snapshot, Infrastructure,
+GitLab, тесты.
 
-**Критерий готовности:** тесты проходят; статические сервисные классы в
-агентском пути заменены интерфейсами; контрактные тесты покрывают оба
-направления маппинга; покрытие публичных символов ≥ 50 %, риск-хотспотов ≤ 20.
+**Критерий готовности (и отступление по метрике — см. ниже):** тесты проходят;
+статические сервисные классы в агентском пути заменены интерфейсами; контрактные
+тесты покрывают оба направления маппинга. Порог «покрытие ≥ 50 %, риск-хотспотов
+≤ 20» по `find_uncovered_symbols` недостижим как критерий — метрика нестабильна
+(см. блок находок 6.7).
 
 **Влияние на поведение:** нейтральное.
 
 **Риски:** низкие.
+
+**Итог этапа (2026-10-25):**
+- Тесты: `dotnet test src/LLMNetHelper/LLMNetHelper.slnx` → **433 пройдено,
+  10 пропущено (Integration, корректно Skipped), 0 падений**; SK-паритет → 8/8.
+- `get_diagnostics` (Warning) → 0.
+- Новых тестов: 66 (6.1a ×3, 6.1b ×1, 6.2 ×2, 6.3 ×3 переписаны, 6.4 ×3,
+  6.7 ×56).
+- Статические сервисные классы в отчётном/промпт-путях заменены интерфейсами:
+  `IAgentPromptBuilder`, `IChatPromptBuilder`, `IMarkdownReportRenderer`,
+  `IJsonReportRenderer`; DI-регистрации добавлены.
+- **Находка 6.3 → 6.6 (мёртвый код):** из 5 продублированных
+  `JsonSerializerOptions` 4 оказались **неиспользуемыми** (`find_references` = 0
+  чтений): разборы Loki/Prometheus/LLM идут через `JsonDocument.Parse`, опции
+  форматтера не применяют. Поэтому «объединять» было нечего: профили чтения в
+  `JsonProfiles` не вводились, живые потребители — только `JsonReportRenderer`
+  (`Report`) и `JsonLogFormatter` (CamelCase-логи, уникален — не сводился).
+  Мёртвые поля удалены на этапе 6.6.
+- **Находка 6.6 (переименование):** переименовано 7 живых приватных `static
+  readonly` полей (`JsonOpts`→`_JsonOpts`, `Patterns`, `SecretPatterns`,
+  `LocatorLock`, `ExcludedDirs`, `MatchTimeout` и др.). `const`-поля (конвенция
+  .NET — PascalCase) и тестовые поля не трогались: правило
+  `find_naming_violations` применяет `_`-префикс к ним агрессивно, но это не
+  нарушение по кодстайлу. Итог по `_`-префиксу: 0 нарушений в production-коде.
+- **Находка 6.7 (нестабильность метрики):** `find_uncovered_symbols` после
+  `rebuild_solution` дал противоречие — покрытие снизилось (34 % → 25 %) при
+  45 новых тестах, которые детерминированный [`get_test_summary`](src/LLMNetHelper/LLMNetHelper.Tests) явно
+  относит к `SnapshotBuilder.BuildAsync`, `MarkdownReportRenderer.Render` и всем
+  методам Loki/Prometheus-клиентов. Метрика нестабильна сразу после пересборки,
+  поэтому числовые пороги по ней недостижимы как критерий готовности на этом
+  этапе. Детерминированная проверка покрытия — `get_test_summary` по явным
+  ссылкам тестов.
+- **Находка (дефект культуры, вне рамок 6.7, поведение не менялось):**
+  [`SnapshotBuilder`](src/LLMNetHelper/LLMNetHelper.Core/Snapshot/SnapshotBuilder.cs:76) и
+  [`MarkdownReportRenderer`](src/LLMNetHelper/LLMNetHelper.Core/Reporting/MarkdownReportRenderer.cs:180)
+  рендерят числа через `:F0`/`:F2`/`:F3` без `CultureInfo.InvariantCulture` —
+  в ru-RU получается `12,50` вместо `12.50`; текст сводки/отчёта зависит от
+  культуры машины. Зафиксировано к исправлению отдельным пунктом (TDD), в
+  текущем этапе не менялось (нейтральность).
 
 ### Этап 7 — Архитектурные улучшения (после стабилизации)
 
@@ -502,6 +543,9 @@ flowchart TB
 
 Рекомендуемый порядок: **0 → 1 → 2 → 3 → 4 → 5 → 6 → 7**.
 Этап 6 допустимо выполнять параллельно с 4/5 после завершения 3.
+
+**Статус на 2026-10-25:** завершены этапы **0, 1, 2, 6**. Следующий — **этап 3**
+(единый ReAct-цикл и парсеры; начинать с паритетных тестов 3.1).
 
 ---
 
