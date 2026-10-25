@@ -31,20 +31,38 @@ public sealed class NativeAgentOrchestrator : IAgentOrchestrator
     };
 
     private readonly IChatClient _chat;
-    private readonly IToolRegistry _registry;
+    // План 22, этап 2.6: сегрегированные контракты вместо жирного IToolRegistry
+    // и устранение проверки типа `_registry is Tools.ToolRegistry`.
+    private readonly IToolCatalog _catalog;
+    private readonly IToolInvoker _invoker;
     private readonly AgentOrchestrationOptions _options;
     private readonly ILogger<NativeAgentOrchestrator> _logger;
 
     public NativeAgentOrchestrator(
         IChatClient chat,
-        IToolRegistry registry,
+        IToolCatalog catalog,
+        IToolInvoker invoker,
         AgentOrchestrationOptions options,
         ILogger<NativeAgentOrchestrator> logger)
     {
         _chat = chat;
-        _registry = registry;
+        _catalog = catalog;
+        _invoker = invoker;
         _options = options;
         _logger = logger;
+    }
+
+    /// <summary>
+    /// Convenience-конструктор: единый реестр-фасад (<see cref="IToolRegistry"/>)
+    /// как каталог и инвокер. Сохраняет совместимость с DI-регистрацией и тестами.
+    /// </summary>
+    public NativeAgentOrchestrator(
+        IChatClient chat,
+        IToolRegistry registry,
+        AgentOrchestrationOptions options,
+        ILogger<NativeAgentOrchestrator> logger)
+        : this(chat, registry, registry, options, logger)
+    {
     }
 
     /// <inheritdoc />
@@ -53,9 +71,9 @@ public sealed class NativeAgentOrchestrator : IAgentOrchestrator
     /// <inheritdoc />
     public async Task<Diagnosis> DiagnoseAsync(AgentContext context, CancellationToken ct = default)
     {
-        var toolDescriptions = _registry is Tools.ToolRegistry concrete
-            ? concrete.DescribeForPrompt()
-            : string.Join('\n', _registry.Tools.Select(static t => $"- `{t.Name}`: {t.Description}"));
+        // План 22, этап 2.6: описание берётся из контракта каталога —
+        // проверка типа конкретного ToolRegistry устранена.
+        var toolDescriptions = _catalog.DescribeForPrompt();
 
         var messages = new List<ChatMessage>
         {
@@ -128,7 +146,7 @@ public sealed class NativeAgentOrchestrator : IAgentOrchestrator
                 return Unknown("Достигнут лимит вызовов инструментов", toolCalls, promptTokens, completionTokens);
             }
 
-            var record = await _registry.InvokeAsync(toolName, toolArgs, ct).ConfigureAwait(false);
+            var record = await _invoker.InvokeAsync(toolName, toolArgs, ct).ConfigureAwait(false);
             toolCalls++;
 
             _logger.LogInformation(

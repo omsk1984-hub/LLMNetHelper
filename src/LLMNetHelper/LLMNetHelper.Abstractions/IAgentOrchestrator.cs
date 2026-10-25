@@ -31,28 +31,12 @@ public interface IAgentOrchestrator
 
 /// <summary>
 /// Реестр инструментов — белый список того, что агент имеет право вызывать.
+/// <para>
+/// План 22, этап 2.6: фасад над сегрегированными контрактами
+/// <see cref="IToolCatalog"/> (запросы) и <see cref="IToolInvoker"/> (команда).
+/// Потребители должны зависеть от узкого контракта, а не от этого фасада.
+/// </para>
 /// </summary>
-public interface IToolRegistry
+public interface IToolRegistry : IToolCatalog, IToolInvoker
 {
-    /// <summary>Все зарегистрированные инструменты.</summary>
-    IReadOnlyList<IAgentTool> Tools { get; }
-
-    /// <summary>Находит инструмент по имени; null, если такого нет.</summary>
-    IAgentTool? Find(string name);
-
-    /// <summary>
-    /// Вызов инструмента по имени с аудитом.
-    /// Имя вне реестра — отказ без выполнения.
-    /// </summary>
-    Task<ToolCallRecord> InvokeAsync(
-        string toolName,
-        string argumentsJson,
-        CancellationToken ct = default);
-
-    /// <summary>
-    /// Сбрасывает журнал вызовов инструментов. Вызывается в начале каждого
-    /// прогона: реестр — singleton, и без сброса журнал одного прогона
-    /// подмешивается в следующий (дефект D4, план 18).
-    /// </summary>
-    void Reset();
 }
