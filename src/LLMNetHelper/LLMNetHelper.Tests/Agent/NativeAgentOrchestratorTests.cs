@@ -218,6 +218,12 @@ public class NativeAgentOrchestratorTests
         Assert.Equal(Verdict.Ok, diagnosis.Verdict);
         Assert.Equal(1, diagnosis.ToolCallCount);
         Assert.Equal(2, chat.CallCount);
+
+        // Политика возврата результата инструмента в историю (паритет, план 22, 3.1):
+        // оркестратор пишет в историю ПОДПИСЬ с числом символов, а не полный текст.
+        var second = chat.ReceivedMessages[1];
+        Assert.Contains(second, m => (m.Text ?? "").Contains("успешно, 16 символов", StringComparison.Ordinal));
+        Assert.DoesNotContain(second, m => (m.Text ?? "").Contains("найдено: runbook", StringComparison.Ordinal));
     }
 
     [Fact]
