@@ -32,6 +32,8 @@ public sealed class ReActLoopEngine : IAgentLoopEngine
             ct.ThrowIfCancellationRequested();
 
             string? responseText;
+            int? stepInputTokens = null;
+            int? stepOutputTokens = null;
             try
             {
                 var response = await chat.GetResponseAsync(messages, cancellationToken: ct).ConfigureAwait(false);
@@ -41,12 +43,14 @@ public sealed class ReActLoopEngine : IAgentLoopEngine
                 {
                     if (usage.InputTokenCount is { } i)
                     {
-                        promptTokens = (promptTokens ?? 0) + (int)Math.Min(i, int.MaxValue);
+                        stepInputTokens = (int)Math.Min(i, int.MaxValue);
+                        promptTokens = (promptTokens ?? 0) + stepInputTokens.Value;
                     }
 
                     if (usage.OutputTokenCount is { } o)
                     {
-                        completionTokens = (completionTokens ?? 0) + (int)Math.Min(o, int.MaxValue);
+                        stepOutputTokens = (int)Math.Min(o, int.MaxValue);
+                        completionTokens = (completionTokens ?? 0) + stepOutputTokens.Value;
                     }
                 }
 
@@ -58,15 +62,15 @@ public sealed class ReActLoopEngine : IAgentLoopEngine
             }
             catch (Exception ex)
             {
-                return strategy.OnLlmFailure(ex.Message, toolCalls, promptTokens, completionTokens);
+                return strategy.OnLlmFailure(ex.Message, toolCalls, promptTokens, completionTokens, stepInputTokens, stepOutputTokens);
             }
 
             if (string.IsNullOrWhiteSpace(responseText))
             {
-                return strategy.OnEmptyResponse(toolCalls, promptTokens, completionTokens);
+                return strategy.OnEmptyResponse(toolCalls, promptTokens, completionTokens, stepInputTokens, stepOutputTokens);
             }
 
-            if (strategy.TryFinalize(responseText, toolCalls, promptTokens, completionTokens, out var finalOutcome))
+            if (strategy.TryFinalize(responseText, toolCalls, promptTokens, completionTokens, stepInputTokens, stepOutputTokens, out var finalOutcome))
             {
                 return finalOutcome;
             }
@@ -74,7 +78,7 @@ public sealed class ReActLoopEngine : IAgentLoopEngine
             // Ответ не финальный — ожидаем запрос инструмента.
             if (toolCalls >= options.ToolCallLimit)
             {
-                return strategy.OnToolCallLimitReached(responseText, toolCalls, promptTokens, completionTokens);
+                return strategy.OnToolCallLimitReached(responseText, toolCalls, promptTokens, completionTokens, stepInputTokens, stepOutputTokens);
             }
 
             if (!ToolCallParser.TryParse(responseText, out var toolName, out var toolArgs))
@@ -82,9 +86,9 @@ public sealed class ReActLoopEngine : IAgentLoopEngine
                 // Свободный текст без JSON и не распознан как финал — стратегия
                 // решает сама (в оркестраторе уже вернул Fallback в TryFinalize;
                 // здесь недостижимо для корректных стратегий).
-                return strategy.TryFinalize(responseText, toolCalls, promptTokens, completionTokens, out var fallbackOutcome)
+                return strategy.TryFinalize(responseText, toolCalls, promptTokens, completionTokens, stepInputTokens, stepOutputTokens, out var fallbackOutcome)
                     ? fallbackOutcome
-                    : strategy.OnEmptyResponse(toolCalls, promptTokens, completionTokens);
+                    : strategy.OnEmptyResponse(toolCalls, promptTokens, completionTokens, stepInputTokens, stepOutputTokens);
             }
 
             observer.OnToolCall(step, toolName, toolArgs);

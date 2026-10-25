@@ -28,6 +28,8 @@ public sealed class DiagnosisReActStrategy : IReActStrategy
         int toolCalls,
         int? promptTokens,
         int? completionTokens,
+        int? stepInputTokens,
+        int? stepOutputTokens,
         out ReActOutcome outcome)
     {
         var diagnosis = DiagnosisParser.TryParse(
@@ -84,16 +86,16 @@ public sealed class DiagnosisReActStrategy : IReActStrategy
     public string FormatToolResult(string toolName, string resultText, bool succeeded) =>
         $"Результат инструмента `{toolName}`:\n{resultText}";
 
-    public ReActOutcome OnLlmFailure(string message, int toolCalls, int? promptTokens, int? completionTokens) =>
+    public ReActOutcome OnLlmFailure(string message, int toolCalls, int? promptTokens, int? completionTokens, int? stepInputTokens = null, int? stepOutputTokens = null) =>
         Unknown($"Сбой LLM: {message}", toolCalls, promptTokens, completionTokens);
 
-    public ReActOutcome OnEmptyResponse(int toolCalls, int? promptTokens, int? completionTokens) =>
+    public ReActOutcome OnEmptyResponse(int toolCalls, int? promptTokens, int? completionTokens, int? stepInputTokens = null, int? stepOutputTokens = null) =>
         Unknown("LLM вернул пустой ответ", toolCalls, promptTokens, completionTokens);
 
-    public ReActOutcome OnToolCallLimitReached(string responseText, int toolCalls, int? promptTokens, int? completionTokens) =>
+    public ReActOutcome OnToolCallLimitReached(string responseText, int toolCalls, int? promptTokens, int? completionTokens, int? stepInputTokens = null, int? stepOutputTokens = null) =>
         Unknown("Достигнут лимит вызовов инструментов", toolCalls, promptTokens, completionTokens);
 
-    public ReActOutcome OnStepLimitReached(int toolCalls, int? promptTokens, int? completionTokens) =>
+    public ReActOutcome OnStepLimitReached(int toolCalls, int? promptTokens, int? completionTokens, int? stepInputTokens = null, int? stepOutputTokens = null) =>
         Unknown("Достигнут лимит шагов", toolCalls, promptTokens, completionTokens);
 
     private ReActOutcome Unknown(string reason, int toolCalls, int? promptTokens, int? completionTokens) =>

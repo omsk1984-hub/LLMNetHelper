@@ -63,8 +63,17 @@ public interface IReActStrategy
     /// Оркестратор: диагноз → финал; иначе tool-call → false; свободный текст
     /// → Fallback-диагноз (финал). Чат: tool-call → false; свободный текст → финал.
     /// </para>
+    /// <param name="stepInputTokens">Usage текущего шага (для транскрипта).</param>
+    /// <param name="stepOutputTokens">Usage текущего шага (для транскрипта).</param>
     /// </summary>
-    bool TryFinalize(string responseText, int toolCalls, int? promptTokens, int? completionTokens, out ReActOutcome outcome);
+    bool TryFinalize(
+        string responseText,
+        int toolCalls,
+        int? promptTokens,
+        int? completionTokens,
+        int? stepInputTokens,
+        int? stepOutputTokens,
+        out ReActOutcome outcome);
 
     /// <summary>
     /// Выполняет инструмент и возвращает понятный результат (для оркестратора —
@@ -78,16 +87,16 @@ public interface IReActStrategy
     string FormatToolResult(string toolName, string resultText, bool succeeded);
 
     /// <summary>Исход при сбое вызова LLM.</summary>
-    ReActOutcome OnLlmFailure(string message, int toolCalls, int? promptTokens, int? completionTokens);
+    ReActOutcome OnLlmFailure(string message, int toolCalls, int? promptTokens, int? completionTokens, int? stepInputTokens = null, int? stepOutputTokens = null);
 
     /// <summary>Исход при пустом ответе модели.</summary>
-    ReActOutcome OnEmptyResponse(int toolCalls, int? promptTokens, int? completionTokens);
+    ReActOutcome OnEmptyResponse(int toolCalls, int? promptTokens, int? completionTokens, int? stepInputTokens = null, int? stepOutputTokens = null);
 
     /// <summary>Исход при достижении лимита вызовов инструментов.</summary>
-    ReActOutcome OnToolCallLimitReached(string responseText, int toolCalls, int? promptTokens, int? completionTokens);
+    ReActOutcome OnToolCallLimitReached(string responseText, int toolCalls, int? promptTokens, int? completionTokens, int? stepInputTokens = null, int? stepOutputTokens = null);
 
     /// <summary>Исход при достижении лимита шагов.</summary>
-    ReActOutcome OnStepLimitReached(int toolCalls, int? promptTokens, int? completionTokens);
+    ReActOutcome OnStepLimitReached(int toolCalls, int? promptTokens, int? completionTokens, int? stepInputTokens = null, int? stepOutputTokens = null);
 }
 
 /// <summary>Наблюдатель за событиями цикла (транскрипт, usage). Все — no-op по умолчанию.</summary>
