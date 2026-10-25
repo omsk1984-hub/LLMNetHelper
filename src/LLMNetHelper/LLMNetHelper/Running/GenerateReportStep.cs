@@ -36,7 +36,17 @@ public sealed class GenerateReportStep : IRunStep
 
     public async Task ExecuteAsync(RunContext context, CancellationToken ct)
     {
-        var analysis = BuildAnalysis(context.Diagnosis!);
+        // Дефект N6 (план 22): явные проверки предусловий вместо null-forgiving.
+        // Гарантия порядка шагов сейчас — только порядок DI-регистраций; при сбое
+        // предыдущего шага здесь был бы NullReferenceException без объяснений.
+        var diagnosis = context.Diagnosis
+            ?? throw new InvalidOperationException(
+                "GenerateReport: Diagnosis отсутствует в контексте прогона — шаг Diagnose не выполнен или упал.");
+        var prometheusFacts = context.PrometheusFacts
+            ?? throw new InvalidOperationException(
+                "GenerateReport: PrometheusFacts отсутствуют в контексте прогона — шаг CollectPrometheus не выполнен или упал.");
+
+        var analysis = BuildAnalysis(diagnosis);
         var dateStr = DateOnly.FromDateTime(context.WindowTo).ToString("yyyy-MM-dd");
 
         var runInfo = new RunInfo
@@ -50,11 +60,11 @@ public sealed class GenerateReportStep : IRunStep
         };
 
         var agentReport = new AgentReport(
-            Orchestrator: context.Diagnosis!.Orchestrator,
-            Hypotheses: context.Diagnosis.Hypotheses,
+            Orchestrator: diagnosis.Orchestrator,
+            Hypotheses: diagnosis.Hypotheses,
             ContextDocuments: context.ContextResult?.Documents ?? [],
             UnavailableSources: context.ContextResult?.UnavailableSources ?? [],
-            ToolCalls: context.Diagnosis.ToolCallCount,
+            ToolCalls: diagnosis.ToolCallCount,
             CodeStructure: context.CodeStructureSummary,
             FixPlanSummary: context.FixPlan?.HasChanges == true ? context.FixPlan.Rationale : null,
             ChangeBranch: context.ChangeOutcome?.BranchName,
@@ -68,7 +78,7 @@ public sealed class GenerateReportStep : IRunStep
             _orchestrator.ProviderName,
             promptTokens: null,
             completionTokens: null,
-            health: context.PrometheusFacts!.MonitoringHealth,
+            health: prometheusFacts.MonitoringHealth,
             agentReport: agentReport);
 
         var json = JsonReportRenderer.Render(
@@ -77,7 +87,7 @@ public sealed class GenerateReportStep : IRunStep
             _orchestrator.ProviderName,
             promptTokens: null,
             completionTokens: null,
-            health: context.PrometheusFacts!.MonitoringHealth);
+            health: prometheusFacts.MonitoringHealth);
 
         var reportBase = Path.Combine(_agentOptions.Value.ReportsDir, $"monitoring_report_{dateStr}");
         await _reportWriter.WriteMarkdownAsync($"{reportBase}.md", markdown, ct).ConfigureAwait(false);
