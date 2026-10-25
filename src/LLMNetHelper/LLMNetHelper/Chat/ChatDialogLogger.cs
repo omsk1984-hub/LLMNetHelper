@@ -138,14 +138,9 @@ public sealed class ChatDialogLogger : IChatTranscript, IDisposable
 
         try
         {
-            var dir = Path.GetFullPath(dialog.Directory);
-            Directory.CreateDirectory(dir);
-
-            var filePath = UniqueFilePath(dir, DateTimeOffset.UtcNow);
-            var writer = new StreamWriter(filePath, append: false, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false))
-            {
-                AutoFlush = true
-            };
+            // План 22, этап 4.7: генерация пути и UTF-8-писателя — в отдельном
+            // компоненте DialogFileProvider.
+            var writer = DialogFileProvider.CreateWriter(dialog.Directory, out var filePath);
 
             var instance = new ChatDialogLogger(filePath, writer, dialog.IncludeContextFragments, logger);
             instance.WriteHeader(headerInfo);
@@ -161,24 +156,11 @@ public sealed class ChatDialogLogger : IChatTranscript, IDisposable
 
     /// <summary>
     /// Имя файла <c>chat-yyyy-MM-dd_HH-mm-ssZ.md</c> (UTC старта сеанса);
-    /// при коллизии — суффиксы <c>-2</c>, <c>-3</c>, …
+    /// при коллизии — суффиксы <c>-2</c>, <c>-3</c>, … (обёртка над
+    /// <see cref="DialogFileProvider.UniqueFilePath"/> для совместимости).
     /// </summary>
-    internal static string UniqueFilePath(string directory, DateTimeOffset utcNow)
-    {
-        // Литералы 'chat' и 'Z' ОБЯЗАТЕЛЬНО в одинарных кавычках: без них
-        // "h" (час) и "t" (AM/PM) в спецификаторах формата исказят имя
-        // ("chat-..." -> "c6P-...").
-        var stem = utcNow.ToString("'chat'-yyyy-MM-dd_HH-mm-ss'Z'", System.Globalization.CultureInfo.InvariantCulture);
-        var candidate = Path.Combine(directory, stem + ".md");
-        var suffix = 2;
-        while (File.Exists(candidate))
-        {
-            candidate = Path.Combine(directory, $"{stem}-{suffix}.md");
-            suffix++;
-        }
-
-        return candidate;
-    }
+    internal static string UniqueFilePath(string directory, DateTimeOffset utcNow) =>
+        DialogFileProvider.UniqueFilePath(directory, utcNow);
 
     /// <inheritdoc />
     public void LogUserMessage(string text)
