@@ -194,8 +194,9 @@ internal static class Program
 
             // Roslyn-слой для режима /tools: регистрируется всегда, но
             // инструменты появляются только при Roslyn:Enabled=true и /repo
-            // (plan 21). Разрешение — через GetService (nullable), чтобы чат
-            // не падал, если слой не зарегистрирован.
+            // (plan 21). План 22, этап 2.8: одна абстракция IRoslynToolFactory
+            // вместо 5 конкретных Roslyn-классов. Разрешение — через GetService
+            // (nullable), чтобы чат не падал, если слой не зарегистрирован.
             var session = new ChatSession(
                 host.Services.GetRequiredService<Microsoft.Extensions.AI.IChatClient>(),
                 scope,
@@ -204,12 +205,7 @@ internal static class Program
                 host.Services.GetRequiredService<ILoggerFactory>(),
                 Console.In,
                 Console.Out,
-                // План 22, этап 2.4: разрешение по абстракции ISolutionLoader.
-                host.Services.GetService<LLMNetHelper.Roslyn.ISolutionLoader>(),
-                host.Services.GetService<LLMNetHelper.Roslyn.CodeSearchService>(),
-                host.Services.GetService<LLMNetHelper.Roslyn.CallGraphService>(),
-                host.Services.GetService<LLMNetHelper.Roslyn.FailurePointAnalyzer>(),
-                host.Services.GetService<LLMNetHelper.Roslyn.RoslynOptions>());
+                host.Services.GetService<IRoslynToolFactory>());
 
             if (tools)
             {

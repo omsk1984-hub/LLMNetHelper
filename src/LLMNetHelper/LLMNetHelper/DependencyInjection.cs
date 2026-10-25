@@ -101,6 +101,10 @@ public static class DependencyInjection
         // --- Анализ кода ---
         services.AddRoslynAnalysis(roslynOptions);
 
+        // План 22, этап 2.8: фабрика Roslyn-инструментов чата (регистрация по
+        // интерфейсу; конкретные Roslyn-сервисы инкапсулированы внутри).
+        services.AddSingleton<IRoslynToolFactory, RoslynToolFactory>();
+
         // --- LLM-транспорты ---
         services.AddMonitorAgentLlm(configuration);
 

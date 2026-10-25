@@ -36,12 +36,10 @@ public sealed class ChatSession
     private readonly TextWriter _out;
 
     // Roslyn-слой (опционален: null => инструменты не регистрируются).
-    // План 22, этап 2.4: абстракция ISolutionLoader вместо конкретного класса.
-    private readonly ISolutionLoader? _solutionLoader;
-    private readonly CodeSearchService? _codeSearch;
-    private readonly CallGraphService? _callGraph;
-    private readonly FailurePointAnalyzer? _failureAnalyzer;
-    private readonly RoslynOptions? _roslynOptions;
+    // План 22, этап 2.8: одна абстракция IRoslynToolFactory вместо
+    // 5 конкретных Roslyn-классов (SolutionLoader, CodeSearchService,
+    // CallGraphService, FailurePointAnalyzer, RoslynOptions).
+    private readonly IRoslynToolFactory? _roslynFactory;
 
     private readonly List<ChatMessage> _history = [];
     private bool _toolsMode;
@@ -55,11 +53,7 @@ public sealed class ChatSession
         ILoggerFactory loggerFactory,
         TextReader @in,
         TextWriter @out,
-        ISolutionLoader? solutionLoader = null,
-        CodeSearchService? codeSearch = null,
-        CallGraphService? callGraph = null,
-        FailurePointAnalyzer? failureAnalyzer = null,
-        RoslynOptions? roslynOptions = null)
+        IRoslynToolFactory? roslynFactory = null)
     {
         _chat = chat;
         _scope = scope;
@@ -68,24 +62,14 @@ public sealed class ChatSession
         _loggerFactory = loggerFactory;
         _in = @in;
         _out = @out;
-        _solutionLoader = solutionLoader;
-        _codeSearch = codeSearch;
-        _callGraph = callGraph;
-        _failureAnalyzer = failureAnalyzer;
-        _roslynOptions = roslynOptions;
+        _roslynFactory = roslynFactory;
     }
 
     /// <summary>
     /// Roslyn-инструменты доступны: слой включён, все зависимости переданы
     /// и текущая область — конкретный репозиторий с файлом решения.
     /// </summary>
-    public bool RoslynAvailable =>
-        _roslynOptions is { Enabled: true }
-        && _solutionLoader is not null
-        && _codeSearch is not null
-        && _callGraph is not null
-        && _failureAnalyzer is not null
-        && _scope.TryGetSolutionPath(out _);
+    public bool RoslynAvailable => _roslynFactory is not null && _roslynFactory.IsAvailable(_scope);
 
     /// <summary>Текущий режим /tools (для тестов и диагностики).</summary>
     public bool ToolsMode => _toolsMode;
@@ -319,11 +303,10 @@ public sealed class ChatSession
             new RepoListFilesTool(_scope, _options)
         };
 
-        if (RoslynAvailable)
+        // План 22, этап 2.8: инструменты создаются фабрикой, null-forgiving убран.
+        if (_roslynFactory is not null)
         {
-            tools.Add(new RepoFailurePointsTool(_scope, _solutionLoader!, _failureAnalyzer!));
-            tools.Add(new RepoCallGraphTool(_scope, _callGraph!));
-            tools.Add(new RepoSymbolSearchTool(_scope, _codeSearch!));
+            tools.AddRange(_roslynFactory.CreateTools(_scope));
         }
 
         return new ToolRegistry(tools);
@@ -399,20 +382,9 @@ public sealed class ChatSession
         _out.WriteLine($"[chat] Roslyn  : {DescribeRoslyn()}");
     }
 
-    private string DescribeRoslyn()
-    {
-        if (_roslynOptions is null || !_roslynOptions.Enabled)
-        {
-            return "выключен (Roslyn:Enabled=false)";
-        }
-
-        if (_scope.CurrentRepo is null)
-        {
-            return "готов, требуется /repo <имя> (анализ только для одного репозитория)";
-        }
-
-        return RoslynAvailable
-            ? "включён: repo_failure_points / repo_call_graph / repo_symbol_search"
-            : "включён, но решение не найдено в " + _scope.RootPath;
-    }
+    private string DescribeRoslyn() =>
+        // План 22, этап 2.8: статус отдаёт фабрика (вся логика Roslyn-слоя там).
+        _roslynFactory is null
+            ? "выключен (слой не зарегистрирован)"
+            : _roslynFactory.DescribeStatus(_scope);
 }

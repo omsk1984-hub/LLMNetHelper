@@ -214,6 +214,8 @@ public class RepoRoslynToolsTests : IDisposable
         public void Dispose() { }
     }
 
+    // План 22, этап 2.8: ChatSession принимает одну абстракцию IRoslynToolFactory
+    // вместо 5 конкретных Roslyn-классов.
     private static ChatSession CreateSession(ChatScope scope, RoslynFixture fx, RoslynOptions? roslynOptions) =>
         new(
             new NoopChatClient(),
@@ -223,11 +225,8 @@ public class RepoRoslynToolsTests : IDisposable
             NullLoggerFactory.Instance,
             new StringReader(""),
             TextWriter.Null,
-            fx.Loader,
-            fx.Search,
-            fx.Graph,
-            fx.Analyzer,
-            roslynOptions);
+            new RoslynToolFactory(fx.Loader, fx.Search, fx.Graph, fx.Analyzer,
+                roslynOptions ?? new RoslynOptions()));
 
     [Fact]
     public void RoslynAvailable_DisabledLayer_False()
@@ -273,7 +272,7 @@ public class RepoRoslynToolsTests : IDisposable
             new StringReader(""),
             TextWriter.Null);
 
-        // Roslyn-зависимости не переданы (null) => недоступны, даже если Enabled.
+        // План 22, этап 2.8: фабрика не передана (null) => Roslyn недоступен.
         Assert.False(session.RoslynAvailable);
     }
 }
