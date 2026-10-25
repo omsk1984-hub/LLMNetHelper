@@ -362,29 +362,49 @@ flowchart LR
   `IDisposable`/`InitializeAsync` убраны из контрактов — реализации
   по-прежнему утилизируются DI-контейнером.
 
-### Этап 3 — Устранение дублирования: единый ReAct-цикл и парсеры
+### Этап 3 — Устранение дублирования: единый ReAct-цикл и парсеры — ЗАВЕРШЁН 2026-10-25
 
 **Цель:** один движок цикла вместо двух копий; парсеры как отдельные компоненты.
 
-| # | Изменение |
-|---|---|
-| 3.1 | **До рефакторинга** — паритетные тесты цикла: фиксация поведения на наборе скриптованных ответов модели (мок `IChatClient`) для [`NativeAgentOrchestrator`](src/LLMNetHelper/LLMNetHelper.Agent/Orchestration/NativeAgentOrchestrator.cs:54) и [`ChatAgentLoop`](src/LLMNetHelper/LLMNetHelper/Chat/ChatAgentLoop.cs:49); расширить существующие наборы |
-| 3.2 | Извлечь парсеры: `DiagnosisParser`, `ToolCallParser`, `FixPlanParser` (интерфейсы в Abstractions); единый `ExtractJson` вместо трёх копий ([`оркестратор`](src/LLMNetHelper/LLMNetHelper.Agent/Orchestration/NativeAgentOrchestrator.cs:403), [`чат`](src/LLMNetHelper/LLMNetHelper/Chat/ChatAgentLoop.cs:216), [`ResponseParser`](src/LLMNetHelper/LLMNetHelper.Core/Analysis/ResponseParser.cs:160)) |
-| 3.3 | [`ResponseParser`](src/LLMNetHelper/LLMNetHelper.Core/Analysis/ResponseParser.cs:26) делегирует общим парсерам; маппинг находок — единственный компонент |
-| 3.4 | Общий `IAgentLoopEngine`: лимиты шагов/вызовов, отмена, обработка сбоев; параметризация стратегией финализации (диагноз/свободный текст) и политикой возврата результата инструмента в историю (число символов/полный текст) |
-| 3.5 | [`NativeAgentOrchestrator`](src/LLMNetHelper/LLMNetHelper.Agent/Orchestration/NativeAgentOrchestrator.cs:26) и [`ChatAgentLoop`](src/LLMNetHelper/LLMNetHelper/Chat/ChatAgentLoop.cs) становятся тонкими адаптерами над движком |
+| # | Изменение | Статус |
+|---|---|---|
+| 3.1 | **До рефакторинга** — паритетные тесты цикла: фиксация поведения на наборе скриптованных ответов модели (мок `IChatClient`) для [`NativeAgentOrchestrator`](src/LLMNetHelper/LLMNetHelper.Agent/Orchestration/NativeAgentOrchestrator.cs:72) и [`ChatAgentLoop`](src/LLMNetHelper/LLMNetHelper/Chat/ChatAgentLoop.cs:41); расширить существующие наборы | [x] коммит `88f0cf7`: паритет «политика возврата результата инструмента» (оркестратор — подпись с числом символов, НЕ полный текст) |
+| 3.2 | Извлечь парсеры: `ToolCallParser`, `DiagnosisParser`, `FixPlanParser`; единый `JsonText.Extract` вместо копий | [x] `61a88cc` (`ToolCallParser`+`JsonText.Extract`, тесты 8), `fad6f7e` (`FixPlanParser`, тесты 7), `90f5cb3` (`DiagnosisParser`, тесты 7) |
+| 3.3 | [`ResponseParser`](src/LLMNetHelper/LLMNetHelper.Core/Analysis/ResponseParser.cs:26) и оркестратор используют общие маппинги находок/вердикта; маппинг находок — единственный компонент | [x] `90f5cb3`: `DiagnosisParser` использует `ResponseParser.ParseFinding`/`CorrectVerdict` |
+| 3.4 | Общий `IAgentLoopEngine`/`ReActLoopEngine`: лимиты шагов/вызовов, отмена, обработка сбоев; параметризация стратегией `IReActStrategy` (диагноз/свободный текст) и политикой возврата результата инструмента | [x] `83e1a62` (движок + `DiagnosisReActStrategy` + тесты 8), `2bffa30` (step-usage для транскрипта) |
+| 3.5 | [`NativeAgentOrchestrator`](src/LLMNetHelper/LLMNetHelper.Agent/Orchestration/NativeAgentOrchestrator.cs:26) и [`ChatAgentLoop`](src/LLMNetHelper/LLMNetHelper/Chat/ChatAgentLoop.cs) становятся тонкими адаптерами над движком | [x] `f127a1a` (оркестратор, −116 строк), `285203e` (чат + `ChatReActStrategy` + observer транскрипта) |
 
-**Затронутые области:** Agent, Chat, Core.Analysis, Abstractions, тесты.
+**Затронутые области:** Agent, Chat, Core.Analysis, тесты.
 
-**Критерий готовности:** тесты проходят, включая паритетные; в
-`NativeAgentOrchestrator` и `ChatAgentLoop` нет собственной логики цикла и
-парсинга; CC обоих классов < 15; `ExtractJson` в единственном экземпляре.
+**Критерий готовности (выполнен):** тесты проходят, включая паритетные
+(461 пройдено / 10 Skipped / 0 failed); в `NativeAgentOrchestrator` и
+`ChatAgentLoop` нет собственной логики цикла и парсинга (тонкие адаптеры);
+CC обоих классов < 15 (в списке рисковых методов не значатся);
+`JsonText.Extract` в агентском пути — единственный экземпляр.
 
-**Влияние на поведение:** потенциально изменяемое (порядок сообщений в истории,
-формулировки отказов) — сначала паритетные тесты (3.1), затем рефакторинг.
+**Влияние на поведение:** нейтральное (подтверждено паритетом: все тесты
+циклов, транскрипта чата и отчётов зелёные ДО и ПОСЛЕ).
 
-**Риски:** высокие — ядро агентской логики. Смягчение: паритетные тесты до
-изменений; атомарные коммиты по одному парсеру.
+**Риски:** высокие — ядро агентской логики. Смягчение использовано: паритетные
+тесты до изменений; атомарные коммиты по одному парсеру/компоненту.
+
+**Итог этапа (2026-10-25):**
+- Тесты: `dotnet test src/LLMNetHelper/LLMNetHelper.slnx` → **461 пройдено,
+  10 пропущено (Integration, корректно Skipped), 0 падений**; SK-паритет → 8/8.
+- `get_diagnostics` (Warning) → 0.
+- Новых тестов: 30 (3.2: ToolCall ×8, FixPlan ×7, Diagnosis ×7; 3.4: движок ×8).
+- Единый ReAct-движок [`ReActLoopEngine`](src/LLMNetHelper/LLMNetHelper.Agent/AgentLoop/ReActLoopEngine.cs:13):
+  общие лимиты/отмена/сбой LLM/разбор tool-call; поведенческие различия —
+  в стратегиях: [`DiagnosisReActStrategy`](src/LLMNetHelper/LLMNetHelper.Agent/AgentLoop/DiagnosisReActStrategy.cs:16)
+  (диагноз, подпись с числом символов) и
+  [`ChatReActStrategy`](src/LLMNetHelper/LLMNetHelper.Agent/AgentLoop/ChatReActStrategy.cs:14)
+  (свободный текст, полный текст результата).
+- Размещение: контракты движка (`IAgentLoopEngine`/`IReActStrategy`/`IReActObserver`)
+  — в проекте **Agent**, а не в Abstractions, т.к. используют MEAI
+  (`IChatClient`/`ChatMessage`) — по правилу размещения, как `IGitLabApiClient` (2.3).
+- `JsonText.Extract` — единый источник извлечения JSON для циклов; приватный
+  хелпер `ResponseParser.ExtractJsonBlock` (фолбэк неагентского парсера) не
+  используется циклами и остаётся локальным.
 
 ### Этап 4 — Декомпозиция god-классов и устранение Service Locator
 
@@ -544,8 +564,8 @@ flowchart TB
 Рекомендуемый порядок: **0 → 1 → 2 → 3 → 4 → 5 → 6 → 7**.
 Этап 6 допустимо выполнять параллельно с 4/5 после завершения 3.
 
-**Статус на 2026-10-25:** завершены этапы **0, 1, 2, 6**. Следующий — **этап 3**
-(единый ReAct-цикл и парсеры; начинать с паритетных тестов 3.1).
+**Статус на 2026-10-25:** завершены этапы **0, 1, 2, 3, 6**. Следующий — **этап 4**
+(декомпозиция god-классов и устранение Service Locator).
 
 ---
 
