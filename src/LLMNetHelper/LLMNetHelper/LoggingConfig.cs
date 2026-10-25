@@ -75,7 +75,7 @@ public static class LoggingConfig
 /// </summary>
 internal sealed class JsonLogFormatter : ITextFormatter
 {
-    private static readonly JsonSerializerOptions JsonOpts = new()
+    private static readonly JsonSerializerOptions _JsonOpts = new()
     {
         PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase,
         WriteIndented = false
@@ -100,6 +100,6 @@ internal sealed class JsonLogFormatter : ITextFormatter
                 .ToDictionary(p => p.Key, p => p.Value.ToString())
         };
 
-        output.WriteLine(System.Text.Json.JsonSerializer.Serialize(obj, JsonOpts));
+        output.WriteLine(System.Text.Json.JsonSerializer.Serialize(obj, _JsonOpts));
     }
 }

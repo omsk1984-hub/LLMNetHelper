@@ -21,7 +21,7 @@ namespace LLMNetHelper.Roslyn;
 // План 22, этап 2.4: реализация контракта ISolutionLoader.
 public sealed class SolutionLoader : ISolutionLoader, IDisposable
 {
-    private static readonly object LocatorLock = new();
+    private static readonly object _LocatorLock = new();
     private static bool _locatorRegistered;
     private static bool _locatorFailed;
 
@@ -178,7 +178,7 @@ public sealed class SolutionLoader : ISolutionLoader, IDisposable
             return false;
         }
 
-        lock (LocatorLock)
+        lock (_LocatorLock)
         {
             if (_locatorRegistered)
             {

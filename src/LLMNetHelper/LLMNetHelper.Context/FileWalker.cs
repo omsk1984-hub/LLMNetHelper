@@ -140,7 +140,7 @@ public sealed record WalkedFile(string RelativePath, string FullPath, long SizeB
 /// </summary>
 public static class GlobCompiler
 {
-    private static readonly TimeSpan MatchTimeout = TimeSpan.FromSeconds(1);
+    private static readonly TimeSpan _MatchTimeout = TimeSpan.FromSeconds(1);
 
     /// <summary>
     /// Компилирует набор glob-шаблонов.
@@ -163,7 +163,7 @@ public static class GlobCompiler
         return new Regex(
             pattern,
             RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled,
-            MatchTimeout);
+            _MatchTimeout);
     }
 
     /// <summary>

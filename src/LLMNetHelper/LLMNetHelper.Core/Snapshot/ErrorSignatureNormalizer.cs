@@ -9,7 +9,7 @@ namespace LLMNetHelper.Core.Snapshot;
 /// </summary>
 public static class ErrorSignatureNormalizer
 {
-    private static readonly Regex[] Patterns =
+    private static readonly Regex[] _Patterns =
     [
         // GUID
         new Regex(@"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", RegexOptions.IgnoreCase),
@@ -35,7 +35,7 @@ public static class ErrorSignatureNormalizer
         if (string.IsNullOrEmpty(text)) return text ?? "";
 
         var result = text;
-        foreach (var pattern in Patterns)
+        foreach (var pattern in _Patterns)
         {
             result = pattern.Replace(result, "<MASKED>");
         }

@@ -16,7 +16,7 @@ public static class SolutionResolver
     /// <summary>Максимальная глубина поиска каталогов решений.</summary>
     public const int MaxDepth = 2;
 
-    private static readonly string[] ExcludedDirs = ["bin", "obj", ".git", ".vs", "node_modules", "packages"];
+    private static readonly string[] _ExcludedDirs = ["bin", "obj", ".git", ".vs", "node_modules", "packages"];
 
     /// <summary>
     /// Ищет файл решения в <paramref name="repoRoot"/>.
@@ -109,7 +109,7 @@ public static class SolutionResolver
         foreach (var sub in subdirs)
         {
             var name = Path.GetFileName(sub);
-            if (ExcludedDirs.Contains(name, StringComparer.OrdinalIgnoreCase) || name.StartsWith('.'))
+            if (_ExcludedDirs.Contains(name, StringComparer.OrdinalIgnoreCase) || name.StartsWith('.'))
             {
                 continue;
             }

@@ -8,7 +8,7 @@ namespace LLMNetHelper.Core.Snapshot;
 /// </summary>
 public static class Redactor
 {
-    private static readonly Regex[] SecretPatterns =
+    private static readonly Regex[] _SecretPatterns =
     [
         // API keys: tapi_sk_..., etc.
         new Regex(@"tapi_sk_[A-Za-z0-9]+", RegexOptions.IgnoreCase),
@@ -32,7 +32,7 @@ public static class Redactor
         if (string.IsNullOrEmpty(text)) return text ?? "";
 
         var result = text;
-        foreach (var pattern in SecretPatterns)
+        foreach (var pattern in _SecretPatterns)
         {
             result = pattern.Replace(result, "[REDACTED]");
         }

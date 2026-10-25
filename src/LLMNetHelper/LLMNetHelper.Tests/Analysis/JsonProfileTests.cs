@@ -5,35 +5,23 @@ using LLMNetHelper.Core.Json;
 namespace LLMNetHelper.Tests.Analysis;
 
 /// <summary>
-/// Контрактные тесты единых профилей сериализации JSON (план 22, этап 6.3).
+/// Контрактный тест профиля сериализации отчётов (план 22, этапы 6.3/6.6).
 /// <para>
-/// До этапа настройки <c>JsonSerializerOptions</c> были продублированы в четырёх
-/// независимых объектах (<c>ResponseParser</c>, <c>LokiHttpClient</c>,
-/// <c>PrometheusHttpClient</c>, <c>NativeAgentOrchestrator</c>) и ещё одном в
-/// <c>JsonReportRenderer</c>: дрейф значений был вопросом времени, потому что
-/// ни один тест не связывал их с единым источником.
+/// Фиксирует семантику wire-формата отчёта и единственный источник истины.
+/// Профиль не подменяется DI: <see cref="JsonSerializerOptions"/> —
+/// неизменяемая после первого использования настройка форматтера, а не сервис
+/// с поведением.
 /// </para>
 /// <para>
-/// Профили не подменяются DI: <see cref="JsonSerializerOptions"/> — неизменяемая
-/// после первого использования настройка форматтера, а не сервис с поведением.
-/// Тесты фиксируют её семантику и единственный источник истины.
+/// Аудит 6.6 удалил четыре мёртвых дубликата <c>JsonOpts</c>
+/// (<c>ResponseParser</c>, <c>LokiHttpClient</c>, <c>PrometheusHttpClient</c>,
+/// <c>NativeAgentOrchestrator</c>): они не читались, потому что разборы идут
+/// через <see cref="JsonDocument"/>. Профиль чтения поэтому не вводился.
 /// </para>
 /// </summary>
 public class JsonProfileTests
 {
     private sealed record Payload(string? Verdict, string? Summary);
-
-    [Fact]
-    public void ReadProfile_IsCaseInsensitive()
-    {
-        // Ответы LLM/Loki/Prometheus приходят в произвольном регистре имён свойств.
-        var parsed = JsonSerializer.Deserialize<Payload>(
-            """{"VERDICT":"Warning","summary":"рост ошибок"}""", JsonProfiles.Read);
-
-        Assert.NotNull(parsed);
-        Assert.Equal("Warning", parsed.Verdict);
-        Assert.Equal("рост ошибок", parsed.Summary);
-    }
 
     [Fact]
     public void ReportProfile_WritesIndentedAndOmitsNulls()
@@ -48,42 +36,21 @@ public class JsonProfileTests
     }
 
     [Fact]
-    public void ReportProfile_DoesNotReuseReadProfileInstance()
+    public void ReportProfile_IsStrictAboutPropertyNames()
     {
-        // Разные назначения (чтение/запись) — разные экземпляры; иначе
-        // PropertyNameCaseInsensitive просочился бы в записываемые отчёты.
-        Assert.False(ReferenceEquals(JsonProfiles.Read, JsonProfiles.Report));
+        // Схема отчёта известна: регистронезависимость чтения здесь не нужна
+        // и не должна просочиться в записываемый JSON.
         Assert.False(JsonProfiles.Report.PropertyNameCaseInsensitive);
     }
 
     [Fact]
-    public void Consumers_UseSharedInstances()
+    public void JsonReportRenderer_UsesSharedReportProfile()
     {
-        // Главный инвариант этапа: потребители не держат независимых копий.
-        AssertSameInstance(
-            typeof(LLMNetHelper.Core.Analysis.ResponseParser).GetField("JsonOpts", BindingFlags.NonPublic | BindingFlags.Static),
-            JsonProfiles.Read);
+        // Инвариант этапа: рендерер отчёта не держит независимой копии настроек.
+        var field = typeof(LLMNetHelper.Core.Reporting.JsonReportRenderer)
+            .GetField("_JsonOpts", BindingFlags.NonPublic | BindingFlags.Static);
 
-        AssertSameInstance(
-            typeof(LLMNetHelper.Infrastructure.Loki.LokiHttpClient).GetField("JsonOpts", BindingFlags.NonPublic | BindingFlags.Static),
-            JsonProfiles.Read);
-
-        AssertSameInstance(
-            typeof(LLMNetHelper.Infrastructure.Prometheus.PrometheusHttpClient).GetField("JsonOpts", BindingFlags.NonPublic | BindingFlags.Static),
-            JsonProfiles.Read);
-
-        AssertSameInstance(
-            typeof(LLMNetHelper.Agent.Orchestration.NativeAgentOrchestrator).GetField("JsonOpts", BindingFlags.NonPublic | BindingFlags.Static),
-            JsonProfiles.Read);
-
-        AssertSameInstance(
-            typeof(LLMNetHelper.Core.Reporting.JsonReportRenderer).GetField("JsonOpts", BindingFlags.NonPublic | BindingFlags.Static),
-            JsonProfiles.Report);
-    }
-
-    private static void AssertSameInstance(FieldInfo? field, JsonSerializerOptions expected)
-    {
         Assert.NotNull(field);
-        Assert.Same(expected, field.GetValue(null));
+        Assert.Same(JsonProfiles.Report, field.GetValue(null));
     }
 }

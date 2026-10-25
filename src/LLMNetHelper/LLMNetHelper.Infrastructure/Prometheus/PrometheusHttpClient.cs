@@ -1,6 +1,5 @@
 using System.Text.Json;
 using LLMNetHelper.Abstractions;
-using LLMNetHelper.Core.Json;
 using Microsoft.Extensions.Options;
 
 namespace LLMNetHelper.Infrastructure.Prometheus;
@@ -14,8 +13,6 @@ public sealed class PrometheusHttpClient : IPrometheusClient
     private readonly HttpClient _http;
     private readonly PrometheusOptions _options;
     // План 22, этап 6.3: единый профиль чтения (см. JsonProfiles).
-    private static readonly JsonSerializerOptions JsonOpts = JsonProfiles.Read;
-
     public PrometheusHttpClient(IOptions<PrometheusOptions> options)
     {
         _options = options.Value ?? throw new ArgumentNullException(nameof(options));

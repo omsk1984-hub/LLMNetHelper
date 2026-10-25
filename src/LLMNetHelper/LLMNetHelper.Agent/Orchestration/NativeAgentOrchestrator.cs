@@ -2,7 +2,6 @@ using System.Text;
 using System.Text.Json;
 using LLMNetHelper.Abstractions;
 using LLMNetHelper.Core.Analysis;
-using LLMNetHelper.Core.Json;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 
@@ -26,9 +25,6 @@ namespace LLMNetHelper.Agent.Orchestration;
 /// </summary>
 public sealed class NativeAgentOrchestrator : IAgentOrchestrator
 {
-    // План 22, этап 6.3: единый профиль чтения (см. JsonProfiles).
-    private static readonly JsonSerializerOptions JsonOpts = JsonProfiles.Read;
-
     private readonly IChatClient _chat;
     // План 22, этап 2.6: сегрегированные контракты вместо жирного IToolRegistry
     // и устранение проверки типа `_registry is Tools.ToolRegistry`.

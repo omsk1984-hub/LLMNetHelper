@@ -13,7 +13,7 @@ namespace LLMNetHelper.Core.Reporting;
 public sealed class JsonReportRenderer : IJsonReportRenderer
 {
     // План 22, этап 6.3: единый профиль отчётов (см. JsonProfiles).
-    private static readonly JsonSerializerOptions JsonOpts = JsonProfiles.Report;
+    private static readonly JsonSerializerOptions _JsonOpts = JsonProfiles.Report;
 
     /// <summary>
     /// Формирует JSON-отчёт из результатов анализа.
@@ -62,6 +62,6 @@ public sealed class JsonReportRenderer : IJsonReportRenderer
             } : (object?)null
         };
 
-        return JsonSerializer.Serialize(report, JsonOpts);
+        return JsonSerializer.Serialize(report, _JsonOpts);
     }
 }
