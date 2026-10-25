@@ -25,6 +25,20 @@ public sealed class LokiHttpClient : ILokiClient
     }
 
     /// <summary>
+    /// Internal-конструктор для тестов (план 22, этап 1.6): подмена транспорта
+    /// через <see cref="HttpMessageHandler"/> без сети.
+    /// </summary>
+    internal LokiHttpClient(IOptions<LokiOptions> options, HttpMessageHandler handler)
+    {
+        _options = options.Value ?? throw new ArgumentNullException(nameof(options));
+        _http = new HttpClient(handler, disposeHandler: true)
+        {
+            BaseAddress = new Uri(_options.BaseUrl),
+            Timeout = TimeSpan.FromSeconds(_options.TimeoutSeconds)
+        };
+    }
+
+    /// <summary>
     /// Выполняет агрегирующий запрос и возвращает сумму по каждому набору меток.
     /// <para>
     /// Loki отдаёт агрегаты в двух форматах в зависимости от эндпоинта:
@@ -137,7 +151,7 @@ public sealed class LokiHttpClient : ILokiClient
     /// ниже не находит ни одной записи — error_samples всегда пуст.
     /// </para>
     /// </summary>
-    public async Task<List<Dictionary<string, object>>> QueryEntriesAsync(
+    public async Task<List<LokiEntry>> QueryEntriesAsync(
         string query, DateTime from, DateTime to, int limit, CancellationToken ct = default)
     {
         try
@@ -160,7 +174,8 @@ public sealed class LokiHttpClient : ILokiClient
             using var doc = JsonDocument.Parse(json);
             var root = doc.RootElement;
 
-            var entries = new List<Dictionary<string, object>>();
+            // План 22, этап 1.6: типизированный LokiEntry вместо Dictionary.
+            var entries = new List<LokiEntry>();
 
             if (root.TryGetProperty("data", out var data) &&
                 data.TryGetProperty("result", out var result) && result.TryGetArray(out var array))
@@ -174,17 +189,14 @@ public sealed class LokiHttpClient : ILokiClient
                         {
                             if (valElem.TryGetArray(out var valArray) && valArray.Length >= 2)
                             {
-                                var entry = new Dictionary<string, object>
-                                {
-                                    ["stream"] = streamLabels,
+                                entries.Add(new LokiEntry(
+                                    streamLabels,
                                     // timestamp записи Loki приходит строкой (наносекунды),
                                     // но не полагаемся на тип: приводим к строке оба варианта.
-                                    ["timestamp"] = TimestampToString(valArray[0]),
-                                    ["text"] = valArray[1].ValueKind == JsonValueKind.String
+                                    TimestampToString(valArray[0]),
+                                    valArray[1].ValueKind == JsonValueKind.String
                                         ? valArray[1].GetString() ?? ""
-                                        : valArray[1].ToString()
-                                };
-                                entries.Add(entry);
+                                        : valArray[1].ToString()));
                             }
                         }
                     }
@@ -195,7 +207,7 @@ public sealed class LokiHttpClient : ILokiClient
         catch (Exception ex)
         {
             Console.Error.WriteLine($"[LOKI] Entries query error: {ex.Message}");
-            return new List<Dictionary<string, object>>();
+            return new List<LokiEntry>();
         }
     }
 

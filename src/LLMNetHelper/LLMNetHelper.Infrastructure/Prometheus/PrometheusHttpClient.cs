@@ -24,6 +24,20 @@ public sealed class PrometheusHttpClient : IPrometheusClient
         };
     }
 
+    /// <summary>
+    /// Internal-конструктор для тестов (план 22, этап 1.6): подмена транспорта
+    /// через <see cref="HttpMessageHandler"/> без сети.
+    /// </summary>
+    internal PrometheusHttpClient(IOptions<PrometheusOptions> options, HttpMessageHandler handler)
+    {
+        _options = options.Value ?? throw new ArgumentNullException(nameof(options));
+        _http = new HttpClient(handler, disposeHandler: true)
+        {
+            BaseAddress = new Uri(_options.BaseUrl),
+            Timeout = TimeSpan.FromSeconds(_options.TimeoutSeconds)
+        };
+    }
+
     public async Task<double?> QueryAsync(string query, CancellationToken ct = default)
     {
         try
@@ -174,53 +188,10 @@ public sealed class PrometheusHttpClient : IPrometheusClient
         _ => element.ToString()
     };
 
-    public async Task<List<Dictionary<string, object?>>> GetAlertingRulesAsync(CancellationToken ct = default)
-    {
-        try
-        {
-            // Дефект N3 (план 22): ответ и документ освобождаются через using.
-            using var response = await _http.GetAsync("/api/v1/rules?type=alert", ct);
-            if (!response.IsSuccessStatusCode)
-            {
-                throw new HttpRequestException(
-                    $"/api/v1/rules: status code {(int)response.StatusCode} ({response.ReasonPhrase}).");
-            }
+    // План 22, этап 1.6: GetAlertingRulesAsync удалён как мёртвый код
+    // (0 потребителей; проверено find_references/analyze_change_impact).
 
-            var json = await response.Content.ReadAsStringAsync(ct);
-            using var doc = JsonDocument.Parse(json);
-
-            var rules = new List<Dictionary<string, object?>>();
-            var root = doc.RootElement;
-
-            if (root.TryGetProperty("data", out var data) &&
-                data.TryGetProperty("groups", out var groups))
-            {
-                foreach (var group in groups.EnumerateArray())
-                {
-                    if (group.TryGetProperty("rules", out var rulesArr))
-                    {
-                        foreach (var rule in rulesArr.EnumerateArray())
-                        {
-                            var dict = new Dictionary<string, object?>();
-                            foreach (var prop in rule.EnumerateObject())
-                            {
-                                dict[prop.Name] = CloneValue(prop.Value);
-                            }
-                            rules.Add(dict);
-                        }
-                    }
-                }
-            }
-            return rules;
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"[PROM] Rules query error: {ex.Message}");
-            return new List<Dictionary<string, object?>>();
-        }
-    }
-
-    public async Task<List<Dictionary<string, object?>>> GetAlertsAsync(CancellationToken ct = default)
+    public async Task<List<PrometheusAlert>> GetAlertsAsync(CancellationToken ct = default)
     {
         try
         {
@@ -235,19 +206,46 @@ public sealed class PrometheusHttpClient : IPrometheusClient
             var json = await response.Content.ReadAsStringAsync(ct);
             using var doc = JsonDocument.Parse(json);
 
-            var alerts = new List<Dictionary<string, object?>>();
+            // План 22, этап 1.6: типизированный PrometheusAlert вместо Dictionary.
+            // Prometheus отдаёт {"data":{"alerts":[{...}]}}.
+            var alerts = new List<PrometheusAlert>();
             var root = doc.RootElement;
 
-            if (root.TryGetProperty("data", out var data) && data.TryGetArray(out var array))
+            if (root.TryGetProperty("data", out var data) &&
+                data.TryGetProperty("alerts", out var alertsElem) &&
+                alertsElem.ValueKind == JsonValueKind.Array)
             {
-                foreach (var alert in array)
+                foreach (var alert in alertsElem.EnumerateArray())
                 {
-                    var dict = new Dictionary<string, object?>();
-                    foreach (var prop in alert.EnumerateObject())
+                    if (alert.ValueKind != JsonValueKind.Object)
                     {
-                        dict[prop.Name] = CloneValue(prop.Value);
+                        continue;
                     }
-                    alerts.Add(dict);
+
+                    var alertname = alert.TryGetProperty("labels", out var labels) &&
+                                    labels.TryGetProperty("alertname", out var nameProp) &&
+                                    nameProp.ValueKind == JsonValueKind.String
+                        ? nameProp.GetString() ?? ""
+                        : "";
+
+                    var state = alert.TryGetProperty("state", out var stateProp) &&
+                                stateProp.ValueKind == JsonValueKind.String
+                        ? stateProp.GetString() ?? ""
+                        : "";
+
+                    var labelDict = new Dictionary<string, string>(StringComparer.Ordinal);
+                    if (alert.TryGetProperty("labels", out var labelsElem) &&
+                        labelsElem.ValueKind == JsonValueKind.Object)
+                    {
+                        foreach (var prop in labelsElem.EnumerateObject())
+                        {
+                            labelDict[prop.Name] = prop.Value.ValueKind == JsonValueKind.String
+                                ? prop.Value.GetString() ?? ""
+                                : prop.Value.ToString();
+                        }
+                    }
+
+                    alerts.Add(new PrometheusAlert(alertname, state, labelDict));
                 }
             }
             return alerts;
@@ -255,7 +253,7 @@ public sealed class PrometheusHttpClient : IPrometheusClient
         catch (Exception ex)
         {
             Console.Error.WriteLine($"[PROM] Alerts query error: {ex.Message}");
-            return new List<Dictionary<string, object?>>();
+            return new List<PrometheusAlert>();
         }
     }
 

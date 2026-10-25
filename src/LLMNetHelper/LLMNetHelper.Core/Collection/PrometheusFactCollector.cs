@@ -22,7 +22,8 @@ public class PrometheusFactCollector : FactCollector<MetricFact, PrometheusFacts
     protected override async Task<PrometheusFacts> CollectCoreAsync(DateTime from, DateTime to, CancellationToken ct)
     {
         var metricFacts = new List<MetricFact>();
-        var alerts = new List<Dictionary<string, object?>>();
+        // План 22, этап 1.6: типизированный PrometheusAlert вместо Dictionary.
+        var alerts = new List<PrometheusAlert>();
         var monitoringHealth = new MonitoringHealthData();
 
         // P1: up{job="prometheus"}
@@ -235,7 +236,7 @@ public class PrometheusFactCollector : FactCollector<MetricFact, PrometheusFacts
 /// </summary>
 public sealed record PrometheusFacts(
     List<MetricFact> MetricFacts,
-    List<Dictionary<string, object?>> Alerts,
+    List<PrometheusAlert> Alerts,
     MonitoringHealthData MonitoringHealth);
 
 /// <summary>

@@ -12,11 +12,16 @@ public interface IPrometheusClient : IDisposable
     Task<List<(string Time, double Value)>> QueryRangeAsync(
         string query, DateTime from, DateTime to, TimeSpan step, CancellationToken ct = default);
 
-    /// <summary>Получение списка правил алертинга.</summary>
-    Task<List<Dictionary<string, object?>>> GetAlertingRulesAsync(CancellationToken ct = default);
-
-    /// <summary>Получение firing alerts.</summary>
-    Task<List<Dictionary<string, object?>>> GetAlertsAsync(CancellationToken ct = default);
+    /// <summary>
+    /// Получение firing alerts.
+    /// <para>
+    /// План 22, этап 1.6: типизированный <see cref="PrometheusAlert"/> вместо
+    /// <c>Dictionary&lt;string, object?&gt;</c>. Метод
+    /// <c>GetAlertingRulesAsync</c> удалён как мёртвый код (0 потребителей,
+    /// проверено <c>find_references</c>).
+    /// </para>
+    /// </summary>
+    Task<List<PrometheusAlert>> GetAlertsAsync(CancellationToken ct = default);
 
     /// <summary>Получение метрик Prometheus для health-check.</summary>
     Task<string?> GetMetricsAsync(CancellationToken ct = default);

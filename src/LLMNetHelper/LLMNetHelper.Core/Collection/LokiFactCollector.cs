@@ -135,28 +135,27 @@ public class LokiFactCollector : FactCollector<LogFact, LokiFacts>
         return results.Values.Sum();
     }
 
+    // План 22, этап 1.6: типизированный LokiEntry вместо Dictionary<string, object>.
     private static List<ErrorSample> NormalizeErrorSamples(
-        List<Dictionary<string, object>> entries, DateTime from, DateTime to)
+        List<LokiEntry> entries, DateTime from, DateTime to)
     {
         var grouped = new Dictionary<string, (List<string> texts, int count, string firstSeen, string lastSeen)>();
 
         foreach (var entry in entries)
         {
-            var text = entry.TryGetValue("text", out var txt) ? (string)txt! : "";
-            var stream = entry.TryGetValue("stream", out var s) ? (string)s! : "";
-            var timestamp = entry.TryGetValue("timestamp", out var ts) ? (string)ts! : "";
+            var text = entry.Text;
 
             var normalized = ErrorSignatureNormalizer.Normalize(text);
             var signature = ErrorSignatureNormalizer.ComputeHash(normalized);
 
             if (!grouped.TryGetValue(signature, out var group))
             {
-                group = (new List<string>(), 0, timestamp, timestamp);
+                group = (new List<string>(), 0, entry.Timestamp, entry.Timestamp);
                 grouped[signature] = group;
             }
 
             group.count++;
-            group.lastSeen = timestamp;
+            group.lastSeen = entry.Timestamp;
             if (group.texts.Count == 0)
                 group.texts.Add(text);
         }
