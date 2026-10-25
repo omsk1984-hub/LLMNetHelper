@@ -141,6 +141,8 @@ public static class DependencyInjection
         services.AddSingleton<IRunStep, PlanFixStep>();
         services.AddSingleton<IRunStep, ApplyChangesStep>();
         services.AddSingleton<IRunStep, GenerateReportStep>();
+        // План 22, этап 4.5: финализация прогона — отдельный шаг после отчёта.
+        services.AddSingleton<IRunStep, FinalizeRunStep>();
 
         // --- Пайплайн и прогон ---
         services.AddSingleton<IAgentPipeline, AgentPipeline>();

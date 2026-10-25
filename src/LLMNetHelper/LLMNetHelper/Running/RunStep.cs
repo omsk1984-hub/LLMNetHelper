@@ -14,6 +14,9 @@ public sealed class RunContext
     public DateTime WindowTo { get; set; }
     public bool DryRun { get; set; }
 
+    /// <summary>Вердикт прогона (итоговый, после коррекции по находкам), для финализации.</summary>
+    public Verdict? RunVerdict { get; set; }
+
     // Facts
     public LokiFacts? LokiFacts { get; set; }
     public PrometheusFacts? PrometheusFacts { get; set; }

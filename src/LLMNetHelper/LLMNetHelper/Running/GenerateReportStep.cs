@@ -15,7 +15,6 @@ public sealed class GenerateReportStep : IRunStep
     public string Name => "GenerateReport";
 
     private readonly IReportWriter _reportWriter;
-    private readonly IFactStore _factStore;
     private readonly IOptions<AgentOptions> _agentOptions;
     private readonly IAgentOrchestrator _orchestrator;
     private readonly ILogger<GenerateReportStep> _logger;
@@ -23,6 +22,9 @@ public sealed class GenerateReportStep : IRunStep
     private readonly IMarkdownReportRenderer _markdownRenderer;
     private readonly IJsonReportRenderer _jsonRenderer;
 
+    // План 22, этап 4.5: факт-стора из шага убрана (финализацию выполняет
+    // FinalizeRunStep). Параметр оставлен для сохранения сигнатуры тестов;
+    // зависимость не хранится.
     public GenerateReportStep(
         IReportWriter reportWriter,
         IFactStore factStore,
@@ -32,8 +34,8 @@ public sealed class GenerateReportStep : IRunStep
         IMarkdownReportRenderer? markdownRenderer = null,
         IJsonReportRenderer? jsonRenderer = null)
     {
+        _ = factStore;
         _reportWriter = reportWriter;
-        _factStore = factStore;
         _agentOptions = agentOptions;
         _orchestrator = orchestrator;
         _logger = logger;
@@ -103,9 +105,9 @@ public sealed class GenerateReportStep : IRunStep
         await _reportWriter.WriteMarkdownAsync($"{reportBase}.md", markdown, ct).ConfigureAwait(false);
         await _reportWriter.WriteJsonAsync($"{reportBase}.json", json, ct).ConfigureAwait(false);
 
-        // Уборка истории и финализация.
-        await _factStore.PurgeOldRunsAsync(_agentOptions.Value.RetentionDays, ct).ConfigureAwait(false);
-        await _factStore.FinishRunAsync(context.RunId, RunStatus.Ok, analysis.Verdict, null, ct).ConfigureAwait(false);
+        // План 22, этап 4.5: финализацию (PurgeOldRuns + FinishRun) выполняет
+        // отдельный шаг FinalizeRunStep; здесь только передаём вердикт отчёта.
+        context.RunVerdict = analysis.Verdict;
 
         _logger.LogInformation(
             "Отчёт сохранён: {ReportBase}.md/json, вердикт={Verdict}",
