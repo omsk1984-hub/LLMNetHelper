@@ -12,7 +12,7 @@ public sealed class PrometheusHttpClient : IPrometheusClient
 {
     private readonly HttpClient _http;
     private readonly PrometheusOptions _options;
-    // План 22, этап 6.3: единый профиль чтения (см. JsonProfiles).
+
     public PrometheusHttpClient(IOptions<PrometheusOptions> options)
     {
         _options = options.Value ?? throw new ArgumentNullException(nameof(options));

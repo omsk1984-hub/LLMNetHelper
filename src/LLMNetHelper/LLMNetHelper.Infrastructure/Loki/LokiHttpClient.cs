@@ -12,7 +12,7 @@ public sealed class LokiHttpClient : ILokiClient
 {
     private readonly HttpClient _http;
     private readonly LokiOptions _options;
-    // План 22, этап 6.3: единый профиль чтения (см. JsonProfiles).
+
     public LokiHttpClient(IOptions<LokiOptions> options)
     {
         _options = options.Value ?? throw new ArgumentNullException(nameof(options));
