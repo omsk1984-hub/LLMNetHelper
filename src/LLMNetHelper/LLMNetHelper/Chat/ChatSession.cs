@@ -25,7 +25,7 @@ namespace LLMNetHelper.Chat;
 /// тесты не требуют консоли.
 /// </para>
 /// </summary>
-public sealed class ChatSession
+public sealed class ChatSession : IChatCommandContext
 {
     private readonly IChatClient _chat;
     private readonly ChatScope _scope;
@@ -77,8 +77,18 @@ public sealed class ChatSession
     /// </summary>
     public bool RoslynAvailable => _roslynFactory is not null && _roslynFactory.IsAvailable(_scope);
 
-    /// <summary>Текущий режим /tools (для тестов и диагностики).</summary>
-    public bool ToolsMode => _toolsMode;
+    /// <summary>Текущий режим /tools (для тестов, диагностики и диспетчер команд).</summary>
+    public bool ToolsMode
+    {
+        get => _toolsMode;
+        set => _toolsMode = value;
+    }
+
+    // План 22, этап 4.2: явная реализация контекста диспетчера команд.
+    ChatScope IChatCommandContext.Scope => _scope;
+    TextWriter IChatCommandContext.Out => _out;
+    IChatTranscript IChatCommandContext.Transcript => _transcript;
+    void IChatCommandContext.ClearHistory() => _history.Clear();
 
     /// <summary>
     /// Запускает сеанс: одиночный вопрос (<paramref name="ask"/>) или интерактивный REPL.
@@ -147,64 +157,15 @@ public sealed class ChatSession
 
                 var command = ChatCommandParser.Parse(line);
 
-                switch (command.Kind)
+                // План 22, этап 4.2: диспетчеризация команд вынесена в
+                // ChatCommandDispatcher; порядок записи в транскрипт сохранён.
+                var result = await ChatCommandDispatcher
+                    .DispatchAsync(command, line, this, ct)
+                    .ConfigureAwait(false);
+
+                if (result.Exit)
                 {
-                    case ChatCommandKind.Message:
-                        if (string.IsNullOrWhiteSpace(command.Argument))
-                        {
-                            continue;
-                        }
-
-                        var answer = await AnswerAsync(command.Argument, ct).ConfigureAwait(false);
-                        _out.WriteLine(answer);
-                        _out.WriteLine();
-                        break;
-
-                    case ChatCommandKind.Help:
-                        _transcript.LogCommand(line.Trim());
-                        PrintHelp();
-                        break;
-
-                    case ChatCommandKind.Exit:
-                        _transcript.LogCommand(line.Trim());
-                        _out.WriteLine("[chat] До встречи.");
-                        return 0;
-
-                    case ChatCommandKind.Repos:
-                        _transcript.LogCommand(line.Trim());
-                        PrintRepos();
-                        break;
-
-                    case ChatCommandKind.Repo:
-                        _scope.TrySetRepo(command.Argument, out var scopeMsg);
-                        _out.WriteLine($"[chat] {scopeMsg}");
-                        _transcript.LogCommand(line.Trim());
-                        _transcript.LogNote($"[область] {scopeMsg}");
-                        break;
-
-                    case ChatCommandKind.Tools:
-                        _toolsMode = !_toolsMode;
-                        _out.WriteLine($"[chat] Режим инструментов: {(_toolsMode ? "включён (ReAct-цикл)" : "выключен (поиск контекста)")}.");
-                        _transcript.LogCommand(line.Trim());
-                        _transcript.LogNote($"[режим] {(_toolsMode ? "/tools (ReAct)" : "поиск контекста (BM25)")}");
-                        break;
-
-                    case ChatCommandKind.Clear:
-                        _history.Clear();
-                        _out.WriteLine("[chat] История очищена.");
-                        _transcript.LogCommand(line.Trim());
-                        _transcript.LogNote("[история] очищена");
-                        break;
-
-                    case ChatCommandKind.Status:
-                        _transcript.LogCommand(line.Trim());
-                        PrintStatus();
-                        break;
-
-                    case ChatCommandKind.Unknown:
-                        _out.WriteLine($"[chat] Неизвестная команда: {command.Argument}. Введите /help.");
-                        _transcript.LogCommand(line.Trim());
-                        break;
+                    return result.ExitCode;
                 }
             }
 
@@ -351,7 +312,7 @@ public sealed class ChatSession
         _out.WriteLine();
     }
 
-    private void PrintHelp()
+    public void PrintHelp()
     {
         _out.WriteLine("/help            — эта справка");
         _out.WriteLine("/exit | /quit    — выход");
@@ -362,7 +323,7 @@ public sealed class ChatSession
         _out.WriteLine("/status          — текущая область, модель, режим");
     }
 
-    private void PrintRepos()
+    public void PrintRepos()
     {
         var repos = _scope.ListRepos();
         if (repos.Count == 0)
@@ -379,7 +340,7 @@ public sealed class ChatSession
         }
     }
 
-    private void PrintStatus()
+    public void PrintStatus()
     {
         _out.WriteLine($"[chat] Область : {DescribeScope()}");
         _out.WriteLine($"[chat] Модель  : {_llmOptions.Model}");
