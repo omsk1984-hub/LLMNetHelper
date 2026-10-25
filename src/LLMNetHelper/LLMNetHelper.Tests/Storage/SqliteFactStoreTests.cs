@@ -60,13 +60,13 @@ public class SqliteFactStoreTests
             await store.InitializeAsync();
 
             var runId = await store.CreateRunAsync("2026-01-01T00:00:00Z", "2026-01-02T00:00:00Z");
-            await store.FinishRunAsync(runId, "ok", Verdict.Warning, null);
+            await store.FinishRunAsync(runId, RunStatus.Ok, Verdict.Warning, null);
 
             var run = await store.GetLastSuccessfulRunAsync(48);
             Assert.NotNull(run);
-            Assert.Equal("ok", run!.Status);
-            // План 22, этап 1.1: verdict в БД — прежняя строка "WARNING",
-            // на выходе хранилища — перечисление.
+            // План 22, этап 1.2: status/verdict в БД — прежние строки,
+            // на выходе хранилища — перечисления.
+            Assert.Equal(RunStatus.Ok, run!.Status);
             Assert.Equal(Verdict.Warning, run.Verdict);
         }
         finally
@@ -155,7 +155,7 @@ public class SqliteFactStoreTests
             // Создаём "старый" запуск (вчера)
             var yesterday = DateTime.UtcNow.AddDays(-1).ToString("o");
             var runId = await store.CreateRunAsync(yesterday, DateTime.UtcNow.ToString("o"));
-            await store.FinishRunAsync(runId, "ok", Verdict.Ok, null);
+            await store.FinishRunAsync(runId, RunStatus.Ok, Verdict.Ok, null);
 
             // Очищаем с retention = 0 дней
             var purged = await store.PurgeOldRunsAsync(0);

@@ -70,7 +70,7 @@ public sealed class SqliteFactStore : IFactStore
     }
 
     public async Task FinishRunAsync(
-        long runId, string status, Verdict? verdict, string? error, CancellationToken ct = default)
+        long runId, RunStatus status, Verdict? verdict, string? error, CancellationToken ct = default)
     {
         using var conn = new SqliteConnection(_connectionString);
         await conn.OpenAsync(ct);
@@ -82,7 +82,8 @@ public sealed class SqliteFactStore : IFactStore
             WHERE id = @run_id;";
 
         cmd.Parameters.AddWithValue("@finished_at", DateTime.UtcNow.ToString("o"));
-        cmd.Parameters.AddWithValue("@status", status);
+        // План 22, этап 1.2: enum → прежняя wire-строка в колонке runs.status.
+        cmd.Parameters.AddWithValue("@status", RunStatusFormat.ToWire(status));
         // План 22, этап 1.1: enum → прежняя wire-строка в колонке runs.verdict.
         cmd.Parameters.AddWithValue("@verdict",
             verdict is { } v ? VerdictFormat.ToWire(v) : DBNull.Value);
@@ -257,7 +258,8 @@ public sealed class SqliteFactStore : IFactStore
                 FinishedAt = reader.IsDBNull(2) ? null : reader.GetString(2),
                 WindowFrom = reader.GetString(3),
                 WindowTo = reader.GetString(4),
-                Status = reader.GetString(5),
+                // План 22, этап 1.2: wire-строка → enum на выходе хранилища.
+                Status = RunStatusFormat.Parse(reader.GetString(5)),
                 // План 22, этап 1.1: wire-строка → enum на выходе хранилища.
                 Verdict = reader.IsDBNull(6) ? null : VerdictFormat.Parse(reader.GetString(6)),
                 LlmProvider = reader.IsDBNull(7) ? null : reader.GetString(7),

@@ -55,7 +55,7 @@ public sealed class GenerateReportStep : IRunStep
             StartedAt = context.WindowFrom.ToString("o"),
             WindowFrom = context.WindowFrom.ToString("o"),
             WindowTo = context.WindowTo.ToString("o"),
-            Status = "ok",
+            Status = RunStatus.Ok,
             Verdict = analysis.Verdict
         };
 
@@ -97,7 +97,7 @@ public sealed class GenerateReportStep : IRunStep
 
         // Уборка истории и финализация.
         await _factStore.PurgeOldRunsAsync(_agentOptions.Value.RetentionDays, ct).ConfigureAwait(false);
-        await _factStore.FinishRunAsync(context.RunId, "ok", analysis.Verdict, null, ct).ConfigureAwait(false);
+        await _factStore.FinishRunAsync(context.RunId, RunStatus.Ok, analysis.Verdict, null, ct).ConfigureAwait(false);
 
         _logger.LogInformation(
             "Отчёт сохранён: {ReportBase}.md/json, вердикт={Verdict}",

@@ -136,7 +136,7 @@ public class GenerateReportStepPreconditionTests
     {
         public Task InitializeAsync(CancellationToken ct = default) => Task.CompletedTask;
         public Task<long> CreateRunAsync(string windowFrom, string windowTo, CancellationToken ct = default) => Task.FromResult(1L);
-        public Task FinishRunAsync(long runId, string status, Verdict? verdict, string? error, CancellationToken ct = default) => Task.CompletedTask;
+        public Task FinishRunAsync(long runId, RunStatus status, Verdict? verdict, string? error, CancellationToken ct = default) => Task.CompletedTask;
         public Task SaveLogFactsAsync(long runId, IEnumerable<LogFact> facts, CancellationToken ct = default) => Task.CompletedTask;
         public Task SaveErrorSamplesAsync(long runId, IEnumerable<ErrorSample> samples, CancellationToken ct = default) => Task.CompletedTask;
         public Task SaveMetricFactsAsync(long runId, IEnumerable<MetricFact> facts, CancellationToken ct = default) => Task.CompletedTask;

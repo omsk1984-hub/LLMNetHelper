@@ -107,7 +107,7 @@ public sealed class AgentRunner : IAgentRunner
                     // Dry-run завершается после snapshot (шаг BuildSnapshot проверяет flag)
                     if (dryRun)
                     {
-                        await _factStore.FinishRunAsync(runId, "ok", Verdict.Ok, null, ct).ConfigureAwait(false);
+                        await _factStore.FinishRunAsync(runId, RunStatus.Ok, Verdict.Ok, null, ct).ConfigureAwait(false);
                         return 0;
                     }
 
@@ -118,14 +118,14 @@ public sealed class AgentRunner : IAgentRunner
                 }
                 catch (OperationCanceledException)
                 {
-                    await _factStore.FinishRunAsync(runId, "failed", null, "отменено", CancellationToken.None)
+                    await _factStore.FinishRunAsync(runId, RunStatus.Failed, null, "отменено", CancellationToken.None)
                         .ConfigureAwait(false);
                     throw;
                 }
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Сбой прогона агента");
-                    await _factStore.FinishRunAsync(runId, "failed", null, ex.Message, ct).ConfigureAwait(false);
+                    await _factStore.FinishRunAsync(runId, RunStatus.Failed, null, ex.Message, ct).ConfigureAwait(false);
                     return 1;
                 }
             }

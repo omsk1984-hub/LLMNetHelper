@@ -40,7 +40,7 @@ public class ReportEndToEndTests
         StartedAt = "2026-01-01T00:00:00.0000000Z",
         WindowFrom = "2026-01-01T00:00:00.0000000Z",
         WindowTo = "2026-01-01T06:00:00.0000000Z",
-        Status = "ok",
+        Status = RunStatus.Ok,
         Verdict = Verdict.Warning
     };
 

@@ -18,11 +18,12 @@ public interface IFactStore : IDisposable
     /// <summary>
     /// Завершает запуск с результатом.
     /// <para>
-    /// План 22, этап 1.1: <paramref name="verdict"/> — перечисление
-    /// <see cref="Verdict"/>; конвертация в wire-строку — внутри хранилища.
+    /// План 22, этапы 1.1/1.2: <paramref name="status"/> и
+    /// <paramref name="verdict"/> — перечисления; конвертация в wire-строки
+    /// — внутри хранилища.
     /// </para>
     /// </summary>
-    Task FinishRunAsync(long runId, string status, Verdict? verdict, string? error, CancellationToken ct = default);
+    Task FinishRunAsync(long runId, RunStatus status, Verdict? verdict, string? error, CancellationToken ct = default);
 
     /// <summary>
     /// Сохраняет агрегаты логов.
