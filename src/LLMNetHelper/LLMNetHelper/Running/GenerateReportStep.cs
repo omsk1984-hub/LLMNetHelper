@@ -94,21 +94,13 @@ public sealed class GenerateReportStep : IRunStep
 
     private static AnalysisResult BuildAnalysis(Diagnosis diagnosis)
     {
-        var findings = new List<Finding>();
-
-        foreach (var item in diagnosis.Findings)
-        {
-            if (item is Finding finding)
-            {
-                findings.Add(finding);
-            }
-        }
-
         return new AnalysisResult
         {
             Verdict = diagnosis.Verdict,
             Summary = diagnosis.Summary,
-            Findings = findings,
+            // Diagnosis.Findings типизирован (IReadOnlyList<Finding>) — фильтр
+            // по типу удалён: именно он молча терял все находки (дефект D1, план 18).
+            Findings = [.. diagnosis.Findings],
             NoiseCandidates = [],
             QuestionsForOwner = diagnosis.QuestionsForOwner.ToList(),
             FallbackUsed = false

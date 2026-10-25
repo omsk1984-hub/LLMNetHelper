@@ -1,4 +1,5 @@
 using LLMCore.Abstractions;
+using LLMNetHelper.Abstractions;
 using LLMNetHelper.Core.Analysis;
 
 namespace LLMNetHelper.Tests.Llm;

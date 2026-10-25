@@ -1,3 +1,4 @@
+using LLMNetHelper.Abstractions;
 using System.Text.Json;
 
 namespace LLMNetHelper.Core.Analysis;
@@ -15,19 +16,8 @@ public sealed class AnalysisResult
     public bool FallbackUsed { get; set; }
 }
 
-/// <summary>
-/// Находка LLM.
-/// </summary>
-public sealed class Finding
-{
-    public string Id { get; set; } = "";
-    public string Severity { get; set; } = "";
-    public string Title { get; set; } = "";
-    public string Evidence { get; set; } = "";
-    public string Impact { get; set; } = "";
-    public string Recommendation { get; set; } = "";
-    public string Confidence { get; set; } = "";
-}
+// Finding перенесён в LLMNetHelper.Abstractions (план 18, пункт 0.1):
+// тип участвует в контракте Diagnosis между оркестратором и отчётностью.
 
 /// <summary>
 /// Разбор ответа LLM: валидный JSON, обрезанный JSON, Markdown-фолбэк.
@@ -111,22 +101,7 @@ public static class ResponseParser
         {
             foreach (var findingElem in findings.EnumerateArray())
             {
-                var finding = new Finding();
-                if (findingElem.TryGetProperty("id", out var idProp) && idProp.ValueKind == JsonValueKind.String)
-                    finding.Id = idProp.GetString() ?? "";
-                if (findingElem.TryGetProperty("severity", out var sevProp) && sevProp.ValueKind == JsonValueKind.String)
-                    finding.Severity = sevProp.GetString() ?? "";
-                if (findingElem.TryGetProperty("title", out var titleProp) && titleProp.ValueKind == JsonValueKind.String)
-                    finding.Title = titleProp.GetString() ?? "";
-                if (findingElem.TryGetProperty("evidence", out var evProp) && evProp.ValueKind == JsonValueKind.String)
-                    finding.Evidence = evProp.GetString() ?? "";
-                if (findingElem.TryGetProperty("impact", out var impProp) && impProp.ValueKind == JsonValueKind.String)
-                    finding.Impact = impProp.GetString() ?? "";
-                if (findingElem.TryGetProperty("recommendation", out var recProp) && recProp.ValueKind == JsonValueKind.String)
-                    finding.Recommendation = recProp.GetString() ?? "";
-                if (findingElem.TryGetProperty("confidence", out var confProp) && confProp.ValueKind == JsonValueKind.String)
-                    finding.Confidence = confProp.GetString() ?? "";
-                result.Findings.Add(finding);
+                result.Findings.Add(ParseFinding(findingElem));
             }
         }
 
@@ -145,6 +120,41 @@ public static class ResponseParser
                 .Select(q => q.GetString() ?? "")
                 .ToList();
         }
+    }
+
+    /// <summary>
+    /// Маппинг одного элемента массива `findings` в типизированную модель
+    /// <see cref="Finding"/>. Общий для неагентского парсера и оркестратора
+    /// (план 18, пункт 0.1): раньше оркестратор клал сырые JsonElement, и
+    /// находки терялись при фильтрации по типу в отчётности (дефект D1).
+    /// Необъектный элемент даёт пустую находку без исключения — оркестратор
+    /// обязан возвращать UNKNOWN, а не падать.
+    /// </summary>
+    public static Finding ParseFinding(JsonElement findingElem)
+    {
+        var finding = new Finding();
+
+        if (findingElem.ValueKind != JsonValueKind.Object)
+        {
+            return finding;
+        }
+
+        if (findingElem.TryGetProperty("id", out var idProp) && idProp.ValueKind == JsonValueKind.String)
+            finding.Id = idProp.GetString() ?? "";
+        if (findingElem.TryGetProperty("severity", out var sevProp) && sevProp.ValueKind == JsonValueKind.String)
+            finding.Severity = sevProp.GetString() ?? "";
+        if (findingElem.TryGetProperty("title", out var titleProp) && titleProp.ValueKind == JsonValueKind.String)
+            finding.Title = titleProp.GetString() ?? "";
+        if (findingElem.TryGetProperty("evidence", out var evProp) && evProp.ValueKind == JsonValueKind.String)
+            finding.Evidence = evProp.GetString() ?? "";
+        if (findingElem.TryGetProperty("impact", out var impProp) && impProp.ValueKind == JsonValueKind.String)
+            finding.Impact = impProp.GetString() ?? "";
+        if (findingElem.TryGetProperty("recommendation", out var recProp) && recProp.ValueKind == JsonValueKind.String)
+            finding.Recommendation = recProp.GetString() ?? "";
+        if (findingElem.TryGetProperty("confidence", out var confProp) && confProp.ValueKind == JsonValueKind.String)
+            finding.Confidence = confProp.GetString() ?? "";
+
+        return finding;
     }
 
     private static string? ExtractJsonBlock(string text)

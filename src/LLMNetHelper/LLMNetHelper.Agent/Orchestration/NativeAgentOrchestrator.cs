@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using LLMNetHelper.Abstractions;
+using LLMNetHelper.Core.Analysis;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 
@@ -245,13 +246,15 @@ public sealed class NativeAgentOrchestrator : IAgentOrchestrator
                 }
             }
 
-            // Находки оставляем как «сырые» объекты: их разбирает существующий ResponseParser.
-            var findings = new List<object>();
+            // Находки маппим сразу в типизированную модель (дефект D1, план 18):
+            // ранее сюда клались сырые JsonElement, которые терялись при
+            // фильтрации `item is Finding` в отчётности.
+            var findings = new List<Finding>();
             if (root.TryGetProperty("findings", out var fArr) && fArr.ValueKind == JsonValueKind.Array)
             {
                 foreach (var f in fArr.EnumerateArray())
                 {
-                    findings.Add(f.Clone());
+                    findings.Add(ResponseParser.ParseFinding(f));
                 }
             }
 

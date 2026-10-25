@@ -293,6 +293,48 @@ public class NativeAgentOrchestratorTests
         Assert.False(plan.HasChanges);
         Assert.Equal(0, chat.CallCount);
     }
+
+    [Fact]
+    public async Task Diagnose_WithFindings_PreservesTypedFindings()
+    {
+        // Дефект D1 (план 18): оркестратор складывал в Diagnosis.Findings сырые
+        // JsonElement (f.Clone()), а GenerateReportStep.BuildAnalysis фильтровал
+        // `item is Finding` — все находки молча терялись в отчёте.
+        // После исправления находки обязаны быть типизированы как Finding.
+        var chat = new ScriptedChatClient("""
+            {
+              "verdict": "WARNING",
+              "summary": "s",
+              "findings": [
+                { "id": "F1", "severity": "warning", "title": "t1", "evidence": "e1",
+                  "impact": "i1", "recommendation": "r1", "confidence": "high" },
+                { "id": "F2", "severity": "critical", "title": "t2", "evidence": "e2",
+                  "impact": "i2", "recommendation": "r2", "confidence": "low" }
+              ]
+            }
+            """);
+
+        var orchestrator = Create(chat, []);
+        var diagnosis = await orchestrator.DiagnoseAsync(Context());
+
+        Assert.Equal(2, diagnosis.Findings.Count);
+
+        // Каждое находка должна быть типизирована как Finding (не JsonElement).
+        // Тест устойчив к смене типа коллекции (IReadOnlyList<object> → IReadOnlyList<Finding>).
+        foreach (var f in diagnosis.Findings)
+        {
+            Assert.IsType<Finding>(f);
+        }
+
+        var first = (Finding)diagnosis.Findings[0];
+        Assert.Equal("F1", first.Id);
+        Assert.Equal("warning", first.Severity);
+        Assert.Equal("t1", first.Title);
+        Assert.Equal("e1", first.Evidence);
+        Assert.Equal("i1", first.Impact);
+        Assert.Equal("r1", first.Recommendation);
+        Assert.Equal("high", first.Confidence);
+    }
 }
 
 public class ToolRegistryTests

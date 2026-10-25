@@ -57,7 +57,9 @@ public sealed record FixPlan(
 /// </summary>
 /// <param name="Verdict">"OK" | "WARNING" | "CRITICAL" | "UNKNOWN".</param>
 /// <param name="Summary">Краткая сводка.</param>
-/// <param name="Findings">Находки (переиспользуется существующая модель <c>Finding</c> из парсера).</param>
+/// <param name="Findings">Находки (типизированная модель <see cref="Finding"/>;
+/// ранее — <c>IReadOnlyList<object></c> с сырыми <c>JsonElement</c>, из-за чего
+/// находки терялись при фильтрации по типу в отчётности — дефект D1, план 18).</param>
 /// <param name="Hypotheses">Гипотезы о причине.</param>
 /// <param name="QuestionsForOwner">Вопросы владельцу сервиса.</param>
 /// <param name="ToolCallCount">Сколько вызовов инструментов потребовалось.</param>
@@ -65,7 +67,7 @@ public sealed record FixPlan(
 public sealed record Diagnosis(
     string Verdict,
     string Summary,
-    IReadOnlyList<object> Findings,
+    IReadOnlyList<Finding> Findings,
     IReadOnlyList<Hypothesis> Hypotheses,
     IReadOnlyList<string> QuestionsForOwner,
     int ToolCallCount,
