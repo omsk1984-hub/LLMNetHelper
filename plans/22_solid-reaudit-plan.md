@@ -231,18 +231,18 @@ flowchart LR
 `dotnet test src/LLMNetHelper/LLMNetHelper.slnx` и отдельным коммитом.
 Порядок этапов обязателен (зависимости — раздел 4).
 
-### Этап 0 — Неотложные дефекты (без изменения структуры)
+### Этап 0 — Неотложные дефекты (без изменения структуры) — ЗАВЕРШЁН 2026-10-25
 
 **Цель:** устранить утечки ресурсов, блокировку потока и хрупкие допущения,
 не меняя архитектуру.
 
-| # | Изменение | Файлы |
-|---|---|---|
-| 0.1 | N1: [`HealthServer.StopAsync`](src/LLMNetHelper/LLMNetHelper/Scheduling/HealthServer.cs:39) — заменить `_serverTask?.Wait(ct)` на `await _serverTask` с защитой от исключений отменённой задачи | Scheduling |
-| 0.2 | N2: [`CustomOpenAiCompatibleClient`](src/LLMCore/LLMCore.Llm/CustomOpenAiCompatibleClient.cs:59) — освобждать `HttpResponseMessage` на путях ретрая и исключений (`using`/`Dispose` перед `continue` и в `catch`); проверить, что [`ParseResponseAsync`](src/LLMCore/LLMCore.Llm/CustomOpenAiCompatibleClient.cs:149) принимает владение | LLMCore.Llm |
-| 0.3 | N3: `using` на `JsonDocument` в [`ResponseParser.Parse`](src/LLMNetHelper/LLMNetHelper.Core/Analysis/ResponseParser.cs:41) (2 места), [`ParseResponseAsync`](src/LLMCore/LLMCore.Llm/CustomOpenAiCompatibleClient.cs:156), [`LokiHttpClient`](src/LLMNetHelper/LLMNetHelper.Infrastructure/Loki/LokiHttpClient.cs:55), [`PrometheusHttpClient`](src/LLMNetHelper/LLMNetHelper.Infrastructure/Prometheus/PrometheusHttpClient.cs:32); `using` на HTTP-ответах в Loki/Prometheus-клиентах | Core, LLMCore.Llm, Infrastructure |
-| 0.4 | N6: [`GenerateReportStep.ExecuteAsync`](src/LLMNetHelper/LLMNetHelper/Running/GenerateReportStep.cs:37) — явные проверки `context.Diagnosis is null` / `context.PrometheusFacts is null` с понятным сбоем вместо `!` | Running |
-| 0.5 | N4 (D6): добавить `PromptTokens`/`CompletionTokens` в [`Diagnosis`](src/LLMNetHelper/LLMNetHelper.Abstractions/AgentModels.cs:67), заполнять в [`NativeAgentOrchestrator`](src/LLMNetHelper/LLMNetHelper.Agent/Orchestration/NativeAgentOrchestrator.cs:54) из `UsageDetails` ответа, передавать в рендереры вместо `null` | Abstractions, Agent, Running |
+| # | Изменение | Файлы | Статус |
+|---|---|---|---|
+| 0.1 | N1: [`HealthServer.StopAsync`](src/LLMNetHelper/LLMNetHelper/Scheduling/HealthServer.cs:39) — заменить `_serverTask?.Wait(ct)` на `await _serverTask` с защитой от исключений отменённой задачи | Scheduling | [x] коммит `216d6cc`, тесты `HealthServerTests` (2) |
+| 0.2 | N2: [`CustomOpenAiCompatibleClient`](src/LLMCore/LLMCore.Llm/CustomOpenAiCompatibleClient.cs:59) — освобждать `HttpResponseMessage` на путях ретрая и исключений (`using`/`Dispose` перед `continue` и в `catch`); проверить, что [`ParseResponseAsync`](src/LLMCore/LLMCore.Llm/CustomOpenAiCompatibleClient.cs:149) принимает владение | LLMCore.Llm | [x] коммит `4292e5e`, тесты `CustomOpenAiClientDisposalTests` (4) |
+| 0.3 | N3: `using` на `JsonDocument` в [`ResponseParser.Parse`](src/LLMNetHelper/LLMNetHelper.Core/Analysis/ResponseParser.cs:41) (2 места), [`ParseResponseAsync`](src/LLMCore/LLMCore.Llm/CustomOpenAiCompatibleClient.cs:156), [`LokiHttpClient`](src/LLMNetHelper/LLMNetHelper.Infrastructure/Loki/LokiHttpClient.cs:55), [`PrometheusHttpClient`](src/LLMNetHelper/LLMNetHelper.Infrastructure/Prometheus/PrometheusHttpClient.cs:32); `using` на HTTP-ответах в Loki/Prometheus-клиентах | Core, LLMCore.Llm, Infrastructure | [x] коммит `199a3d9` (`EnsureSuccessStatusCode` → явная проверка: `using`-переменная не переприсваивается, `DisposableDiscarded` исчез) |
+| 0.4 | N6: [`GenerateReportStep.ExecuteAsync`](src/LLMNetHelper/LLMNetHelper/Running/GenerateReportStep.cs:37) — явные проверки `context.Diagnosis is null` / `context.PrometheusFacts is null` с понятным сбоем вместо `!` | Running | [x] коммит `aff0265`, тесты `GenerateReportStepPreconditionTests` (2) |
+| 0.5 | N4 (D6): добавить `PromptTokens`/`CompletionTokens` в [`Diagnosis`](src/LLMNetHelper/LLMNetHelper.Abstractions/AgentModels.cs:67), заполнять в [`NativeAgentOrchestrator`](src/LLMNetHelper/LLMNetHelper.Agent/Orchestration/NativeAgentOrchestrator.cs:54) из `UsageDetails` ответа, передавать в рендереры вместо `null` | Abstractions, Agent, Running | [x] коммит `a89f3ed`, тесты `Diagnose_UsageInResponse_CarriedIntoDiagnosis` + `ExecuteAsync_DiagnosisWithTokens_TokensReachMarkdownReport` |
 
 **Затронутые области:** хостинг, LLM-транспорт, парсинг, инфраструктура, отчётность.
 
@@ -256,6 +256,19 @@ flowchart LR
 
 **Риски:** низкие. 0.2 требует аккуратности: `ParseResponseAsync` читает
 содержимое ответа — освобождать только после чтения.
+
+**Итог этапа (2026-10-25):**
+- Тесты: `dotnet test src/LLMNetHelper/LLMNetHelper.slnx` → **300 пройдено,
+  10 пропущено (Integration, корректно Skipped), 0 падений**;
+  SK-паритет `LLMCore.Orchestration.SemanticKernel.Tests` → 8/8.
+- `get_diagnostics` (Warning) → 0; `find_async_violations` → 0;
+  `find_disposable_misuse` → `DisposableDiscarded` (Error) **8 → 0**,
+  предупреждения в целевых файлах 0.3 устранены (остались 9 Warning вне
+  области этапа: Stream-адаптеры процессов, DI-владелцы, `HttpListener`).
+- Новых тестов: 10 (N1 ×2, N2 ×4, N6 ×2, N4 ×2).
+- Поведение: в отчётах появились значения токенов (N4); `StopAsync`
+  health-сервера не роняет остановку хоста при сбое слушателя (N1);
+  HTTP-ответы и JSON-документы освобождаются на всех путях (N2/N3).
 
 ### Этап 1 — Типобезопасность домена
 
