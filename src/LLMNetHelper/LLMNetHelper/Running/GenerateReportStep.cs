@@ -72,12 +72,14 @@ public sealed class GenerateReportStep : IRunStep
             ChangeMessage: context.ChangeOutcome?.Message,
             PatchPath: context.PatchPath);
 
+        // Дефект N4 (план 22): токены из Diagnosis доходят до рендереров
+        // (раньше здесь были жёсткие null).
         var markdown = MarkdownReportRenderer.Render(
             analysis,
             runInfo,
             _orchestrator.ProviderName,
-            promptTokens: null,
-            completionTokens: null,
+            promptTokens: diagnosis.PromptTokens,
+            completionTokens: diagnosis.CompletionTokens,
             health: prometheusFacts.MonitoringHealth,
             agentReport: agentReport);
 
@@ -85,8 +87,8 @@ public sealed class GenerateReportStep : IRunStep
             analysis,
             runInfo,
             _orchestrator.ProviderName,
-            promptTokens: null,
-            completionTokens: null,
+            promptTokens: diagnosis.PromptTokens,
+            completionTokens: diagnosis.CompletionTokens,
             health: prometheusFacts.MonitoringHealth);
 
         var reportBase = Path.Combine(_agentOptions.Value.ReportsDir, $"monitoring_report_{dateStr}");

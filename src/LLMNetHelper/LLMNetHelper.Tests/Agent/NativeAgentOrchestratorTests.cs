@@ -83,6 +83,62 @@ public class NativeAgentOrchestratorTests
         }
     }
 
+    /// <summary>
+    /// Фейковый клиент: отдаёт один ответ с заполненным <c>Usage</c>
+    /// (дефект N4, план 22 — токены терялись между транспортом и отчётом).
+    /// </summary>
+    private sealed class UsageChatClient(string text, long inputTokens, long outputTokens) : IChatClient
+    {
+        public Task<ChatResponse> GetResponseAsync(
+            IEnumerable<ChatMessage> messages,
+            ChatOptions? options = null,
+            CancellationToken cancellationToken = default)
+        {
+            var message = new ChatMessage(ChatRole.Assistant, text);
+            var response = new ChatResponse(message)
+            {
+                FinishReason = ChatFinishReason.Stop,
+                ModelId = "usage-model",
+                Usage = new UsageDetails
+                {
+                    InputTokenCount = inputTokens,
+                    OutputTokenCount = outputTokens
+                }
+            };
+
+            return Task.FromResult(response);
+        }
+
+        public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
+            IEnumerable<ChatMessage> messages,
+            ChatOptions? options = null,
+            CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public object? GetService(Type serviceType, object? serviceKey = null) => null;
+
+        public void Dispose()
+        {
+        }
+    }
+
+    /// <summary>
+    /// Дефект N4 (план 22): usage модели обязан доходить до <see cref="Diagnosis"/>,
+    /// а не теряться по дороге в отчёт (раньше <c>GenerateReportStep</c>
+    /// передавал в рендереры <c>null</c>).
+    /// </summary>
+    [Fact]
+    public async Task Diagnose_UsageInResponse_CarriedIntoDiagnosis()
+    {
+        var chat = new UsageChatClient("""{"verdict":"OK","summary":"с"}""", 10, 5);
+        var orchestrator = Create(chat, []);
+
+        var diagnosis = await orchestrator.DiagnoseAsync(Context());
+
+        Assert.Equal("OK", diagnosis.Verdict);
+        Assert.Equal(10, diagnosis.PromptTokens);
+        Assert.Equal(5, diagnosis.CompletionTokens);
+    }
+
     private static AgentContext Context()
     {
         return new AgentContext(

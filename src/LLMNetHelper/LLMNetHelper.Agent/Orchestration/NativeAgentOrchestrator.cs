@@ -65,6 +65,11 @@ public sealed class NativeAgentOrchestrator : IAgentOrchestrator
 
         var toolCalls = 0;
 
+        // Дефект N4 (план 22): накапливаем usage модели по всем вызовам цикла,
+        // чтобы токены доходили до отчёта (раньше терялись между транспортом и рендерером).
+        int? promptTokens = null;
+        int? completionTokens = null;
+
         for (var step = 0; step < _options.MaxSteps; step++)
         {
             ct.ThrowIfCancellationRequested();
@@ -75,6 +80,19 @@ public sealed class NativeAgentOrchestrator : IAgentOrchestrator
             {
                 var response = await _chat.GetResponseAsync(messages, cancellationToken: ct).ConfigureAwait(false);
                 responseText = response.Text;
+
+                if (response.Usage is { } usage)
+                {
+                    if (usage.InputTokenCount is { } i)
+                    {
+                        promptTokens = (promptTokens ?? 0) + (int)Math.Min(i, int.MaxValue);
+                    }
+
+                    if (usage.OutputTokenCount is { } o)
+                    {
+                        completionTokens = (completionTokens ?? 0) + (int)Math.Min(o, int.MaxValue);
+                    }
+                }
             }
             catch (OperationCanceledException)
             {
@@ -83,16 +101,16 @@ public sealed class NativeAgentOrchestrator : IAgentOrchestrator
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Сбой вызова LLM на шаге {Step}", step);
-                return Unknown($"Сбой LLM: {ex.Message}", toolCalls);
+                return Unknown($"Сбой LLM: {ex.Message}", toolCalls, promptTokens, completionTokens);
             }
 
             if (string.IsNullOrWhiteSpace(responseText))
             {
-                return Unknown("LLM вернул пустой ответ", toolCalls);
+                return Unknown("LLM вернул пустой ответ", toolCalls, promptTokens, completionTokens);
             }
 
             // Пытаемся разобрать как финальный JSON.
-            if (TryParseDiagnosis(responseText, toolCalls, out var diagnosis))
+            if (TryParseDiagnosis(responseText, toolCalls, promptTokens, completionTokens, out var diagnosis))
             {
                 return diagnosis!;
             }
@@ -101,13 +119,13 @@ public sealed class NativeAgentOrchestrator : IAgentOrchestrator
             if (!TryParseToolCall(responseText, out var toolName, out var toolArgs))
             {
                 // Модель ответила текстом без JSON — это финальный ответ в свободной форме.
-                return FallbackDiagnosis(responseText, toolCalls);
+                return FallbackDiagnosis(responseText, toolCalls, promptTokens, completionTokens);
             }
 
             if (toolCalls >= _options.ToolCallLimit)
             {
                 _logger.LogWarning("Достигнут лимит вызовов инструментов ({Limit})", _options.ToolCallLimit);
-                return Unknown("Достигнут лимит вызовов инструментов", toolCalls);
+                return Unknown("Достигнут лимит вызовов инструментов", toolCalls, promptTokens, completionTokens);
             }
 
             var record = await _registry.InvokeAsync(toolName, toolArgs, ct).ConfigureAwait(false);
@@ -124,7 +142,7 @@ public sealed class NativeAgentOrchestrator : IAgentOrchestrator
         }
 
         _logger.LogWarning("Достигнут лимит шагов ({Limit})", _options.MaxSteps);
-        return Unknown("Достигнут лимит шагов", toolCalls);
+        return Unknown("Достигнут лимит шагов", toolCalls, promptTokens, completionTokens);
     }
 
     /// <inheritdoc />
@@ -186,7 +204,12 @@ public sealed class NativeAgentOrchestrator : IAgentOrchestrator
     /// <summary>
     /// Разбор финального диагноза.
     /// </summary>
-    private bool TryParseDiagnosis(string text, int toolCalls, out Diagnosis? diagnosis)
+    private bool TryParseDiagnosis(
+        string text,
+        int toolCalls,
+        int? promptTokens,
+        int? completionTokens,
+        out Diagnosis? diagnosis)
     {
         diagnosis = null;
 
@@ -269,7 +292,9 @@ public sealed class NativeAgentOrchestrator : IAgentOrchestrator
                 hypotheses,
                 questions,
                 toolCalls,
-                ProviderName);
+                ProviderName,
+                promptTokens,
+                completionTokens);
 
             return true;
         }
@@ -427,7 +452,7 @@ public sealed class NativeAgentOrchestrator : IAgentOrchestrator
     /// <summary>
     /// Диагноз при неструктурированном ответе модели.
     /// </summary>
-    private Diagnosis FallbackDiagnosis(string text, int toolCalls)
+    private Diagnosis FallbackDiagnosis(string text, int toolCalls, int? promptTokens, int? completionTokens)
     {
         var summary = text.Length > 500 ? text[..500] + "…" : text;
 
@@ -438,11 +463,13 @@ public sealed class NativeAgentOrchestrator : IAgentOrchestrator
             [],
             ["Модель вернула ответ в свободной форме — требуется ручной разбор."],
             toolCalls,
-            ProviderName);
+            ProviderName,
+            promptTokens,
+            completionTokens);
     }
 
-    private Diagnosis Unknown(string reason, int toolCalls)
+    private Diagnosis Unknown(string reason, int toolCalls, int? promptTokens, int? completionTokens)
     {
-        return new Diagnosis("UNKNOWN", reason, [], [], [], toolCalls, ProviderName);
+        return new Diagnosis("UNKNOWN", reason, [], [], [], toolCalls, ProviderName, promptTokens, completionTokens);
     }
 }

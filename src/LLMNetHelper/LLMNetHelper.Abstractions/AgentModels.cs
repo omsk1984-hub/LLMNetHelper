@@ -64,6 +64,10 @@ public sealed record FixPlan(
 /// <param name="QuestionsForOwner">Вопросы владельцу сервиса.</param>
 /// <param name="ToolCallCount">Сколько вызовов инструментов потребовалось.</param>
 /// <param name="Orchestrator">Имя оркестратора: "native" | "semantic-kernel".</param>
+/// <param name="PromptTokens">Суммарные токены входа по всем вызовам модели
+/// (дефект N4, план 22: раньше usage терялся и отчёт получал <c>null</c>).
+/// <c>null</c> — провайдер не вернул usage.</param>
+/// <param name="CompletionTokens">Суммарные токены ответа (см. <paramref name="PromptTokens"/>).</param>
 public sealed record Diagnosis(
     string Verdict,
     string Summary,
@@ -71,7 +75,9 @@ public sealed record Diagnosis(
     IReadOnlyList<Hypothesis> Hypotheses,
     IReadOnlyList<string> QuestionsForOwner,
     int ToolCallCount,
-    string Orchestrator);
+    string Orchestrator,
+    int? PromptTokens = null,
+    int? CompletionTokens = null);
 
 /// <summary>
 /// Контекст одного агентского прогона: всё, что агент знает до начала работы.

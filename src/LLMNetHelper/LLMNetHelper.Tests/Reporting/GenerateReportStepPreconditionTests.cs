@@ -60,9 +60,34 @@ public class GenerateReportStepPreconditionTests
         Assert.Contains("PrometheusFacts", ex.Message, StringComparison.Ordinal);
     }
 
-    private static GenerateReportStep CreateStep() =>
+    /// <summary>
+    /// Дефект N4 (план 22): токены из <see cref="Diagnosis"/> обязаны
+    /// доходить до Markdown-отчёта (раньше шаг передавал в рендереры <c>null</c>).
+    /// </summary>
+    [Fact]
+    public async Task ExecuteAsync_DiagnosisWithTokens_TokensReachMarkdownReport()
+    {
+        var writer = new RecordingReportWriter();
+        var step = CreateStep(writer);
+        var context = new RunContext
+        {
+            RunId = 1,
+            WindowFrom = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+            WindowTo = new DateTime(2026, 1, 1, 6, 0, 0, DateTimeKind.Utc),
+            Diagnosis = new Diagnosis("OK", "s", [], [], [], 0, "native", PromptTokens: 123, CompletionTokens: 45),
+            PrometheusFacts = new PrometheusFacts([], [], new MonitoringHealthData())
+        };
+
+        await step.ExecuteAsync(context, CancellationToken.None);
+
+        Assert.Contains("123", writer.Markdown, StringComparison.Ordinal);
+        Assert.Contains("45", writer.Markdown, StringComparison.Ordinal);
+        Assert.Contains("\"prompt_tokens\": 123", writer.Json, StringComparison.Ordinal);
+    }
+
+    private static GenerateReportStep CreateStep(IReportWriter? writer = null) =>
         new(
-            new NullReportWriter(),
+            writer ?? new NullReportWriter(),
             new NoopFactStore(),
             Options.Create(new AgentOptions { ReportsDir = Path.GetTempPath() }),
             new StubOrchestrator(),
@@ -72,6 +97,26 @@ public class GenerateReportStepPreconditionTests
     {
         public Task WriteMarkdownAsync(string path, string content, CancellationToken ct = default) => Task.CompletedTask;
         public Task WriteJsonAsync(string path, string json, CancellationToken ct = default) => Task.CompletedTask;
+        public Task WriteTextAsync(string path, string content, CancellationToken ct = default) => Task.CompletedTask;
+    }
+
+    private sealed class RecordingReportWriter : IReportWriter
+    {
+        public string Markdown { get; private set; } = "";
+        public string Json { get; private set; } = "";
+
+        public Task WriteMarkdownAsync(string path, string content, CancellationToken ct = default)
+        {
+            Markdown = content;
+            return Task.CompletedTask;
+        }
+
+        public Task WriteJsonAsync(string path, string json, CancellationToken ct = default)
+        {
+            Json = json;
+            return Task.CompletedTask;
+        }
+
         public Task WriteTextAsync(string path, string content, CancellationToken ct = default) => Task.CompletedTask;
     }
 
