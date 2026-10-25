@@ -30,7 +30,7 @@ public sealed class FileReportWriter : IReportWriter
         await File.WriteAllTextAsync(fullPath, json, Encoding.UTF8, ct);
     }
 
-    public async Task WriteSnapshotAsync(string path, string content, CancellationToken ct = default)
+    public async Task WriteTextAsync(string path, string content, CancellationToken ct = default)
     {
         var fullPath = EnsurePath(path);
         await File.WriteAllTextAsync(fullPath, content, Encoding.UTF8, ct);

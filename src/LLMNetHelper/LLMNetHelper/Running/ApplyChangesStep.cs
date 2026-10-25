@@ -54,7 +54,7 @@ public sealed class ApplyChangesStep : IRunStep
             {
                 context.PatchPath = Path.Combine(_agentOptions.Value.ReportsDir, $"patch_{context.RunId}.diff");
                 await _reportWriter
-                    .WriteSnapshotAsync(context.PatchPath, changeOutcome.Diff, ct)
+                    .WriteTextAsync(context.PatchPath, changeOutcome.Diff, ct)
                     .ConfigureAwait(false);
             }
         }

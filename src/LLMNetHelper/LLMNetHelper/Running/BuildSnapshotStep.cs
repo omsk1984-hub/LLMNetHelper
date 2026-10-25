@@ -41,7 +41,7 @@ public sealed class BuildSnapshotStep : IRunStep
 
         var dateStr = DateOnly.FromDateTime(context.WindowTo).ToString("yyyy-MM-dd");
         context.SnapshotPath = Path.Combine(_options.Value.ReportsDir, $"snapshot_{dateStr}.md");
-        await _reportWriter.WriteSnapshotAsync(context.SnapshotPath, snapshot.SnapshotText, ct).ConfigureAwait(false);
+        await _reportWriter.WriteTextAsync(context.SnapshotPath, snapshot.SnapshotText, ct).ConfigureAwait(false);
 
         if (context.DryRun)
         {

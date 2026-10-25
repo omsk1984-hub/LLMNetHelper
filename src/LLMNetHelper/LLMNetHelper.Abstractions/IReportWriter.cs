@@ -19,7 +19,10 @@ public interface IReportWriter
     Task WriteJsonAsync(string path, string json, CancellationToken ct = default);
 
     /// <summary>
-    /// Записывает snapshot (сводку для LLM).
+    /// Записывает произвольный текстовый артефакт (snapshot-сводку, patch.diff
+    /// и т.п.) как есть, без сериализации. Прежнее имя <c>WriteSnapshotAsync</c>
+    /// вводило в заблуждение: метод использовался и для записи diff (дефект D7,
+    /// план 18).
     /// </summary>
-    Task WriteSnapshotAsync(string path, string content, CancellationToken ct = default);
+    Task WriteTextAsync(string path, string content, CancellationToken ct = default);
 }
