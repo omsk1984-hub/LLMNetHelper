@@ -10,7 +10,8 @@ namespace LLMNetHelper.GitLab;
 /// Поддерживает пагинацию через <c>per_page</c> + <c>page</c>.
 /// </para>
 /// </summary>
-public sealed class GitLabApiClient : IDisposable
+// План 22, этап 2.3: реализация контракта IGitLabApiClient.
+public sealed class GitLabApiClient : IGitLabApiClient, IDisposable
 {
     private readonly HttpClient _http;
     private readonly GitLabOptions _options;

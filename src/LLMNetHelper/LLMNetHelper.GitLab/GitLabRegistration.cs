@@ -19,7 +19,8 @@ public static class GitLabRegistration
         // HttpClientHandler. На хостах с Windows-прокси/SChannel рукопожатие
         // TLS 1.3 падает с Win32Exception 0x80004005 («Не удается установить связь
         // с локальной системой безопасности») — GitLab:TlsProtocols="Tls12" лечит это.
-        services.AddSingleton(sp =>
+        // План 22, этап 2.3: регистрация по интерфейсу IGitLabApiClient.
+        services.AddSingleton<IGitLabApiClient>(sp =>
         {
             var options = sp.GetRequiredService<GitLabOptions>();
 

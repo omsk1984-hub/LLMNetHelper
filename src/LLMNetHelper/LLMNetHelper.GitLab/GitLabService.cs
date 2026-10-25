@@ -34,11 +34,12 @@ public sealed record RepoOperationResult(
 /// </summary>
 public sealed class GitLabService
 {
-    private readonly GitLabApiClient _apiClient;
+    // План 22, этап 2.3: зависимость от абстракции IGitLabApiClient.
+    private readonly IGitLabApiClient _apiClient;
     private readonly GitLabOptions _options;
     private readonly IProgress<RepoOperationResult>? _progress;
 
-    public GitLabService(GitLabApiClient apiClient, GitLabOptions options, IProgress<RepoOperationResult>? progress = null)
+    public GitLabService(IGitLabApiClient apiClient, GitLabOptions options, IProgress<RepoOperationResult>? progress = null)
     {
         _apiClient = apiClient;
         _options = options;

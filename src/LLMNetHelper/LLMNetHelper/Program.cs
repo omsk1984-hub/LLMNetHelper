@@ -308,7 +308,7 @@ internal static class Program
         try
         {
             var withProgress = new GitLabService(
-                host.Services.GetRequiredService<GitLabApiClient>(),
+                host.Services.GetRequiredService<IGitLabApiClient>(),
                 options,
                 progress);
 
