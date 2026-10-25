@@ -40,7 +40,27 @@ public sealed class HealthServer : IHostedService
     {
         _logger.LogInformation("[HEALTH] Stopping health server on port {Port}", _port);
         _cts?.Cancel();
-        _serverTask?.Wait(cancellationToken);
+
+        // Дефект N1 (план 22): раньше здесь был _serverTask?.Wait(ct) —
+        // sync-over-async, блокировавший поток остановки и заворачивавший
+        // сбой слушателя (например, конфликт портов) в AggregateException.
+        // Теперь полноценный await; сбой фонового цикла логируем, но не роняем остановку.
+        if (_serverTask is { } serverTask)
+        {
+            try
+            {
+                await serverTask.ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogWarning(ex, "[HEALTH] Фоновый цикл health-сервера завершился сбоем");
+            }
+            catch (OperationCanceledException)
+            {
+                // Ожидается при отмене — штатная остановка.
+            }
+        }
+
         _cts?.Dispose();
     }
 
