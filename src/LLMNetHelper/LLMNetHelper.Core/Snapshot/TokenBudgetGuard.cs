@@ -7,15 +7,10 @@ namespace LLMNetHelper.Core.Snapshot;
 /// Порядок обрезки: sample_text → TopErrorsLimit → редкие ошибки.
 /// Агрегаты не режутся никогда.
 /// </summary>
+// План 22, этап 6.5: статический доступ (TokenBudgetGuard.Instance) удалён —
+// экземпляр получается только через DI (ISnapshotBudgetEnforcer).
 public sealed class TokenBudgetGuard : ISnapshotBudgetEnforcer
 {
-    private static readonly TokenBudgetGuard _instance = new();
-
-    /// <summary>
-    /// Экземпляр для статического доступа (тесты).
-    /// </summary>
-    public static TokenBudgetGuard Instance => _instance;
-
     // Ориентировочная оценка: ~4 символа на токен (для английского/русского)
     private const int CharsPerToken = 4;
     private const int MaxTokens = 6000; // безопасный бюджет для компактной сводки
