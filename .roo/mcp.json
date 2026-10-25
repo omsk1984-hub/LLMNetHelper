@@ -72,7 +72,9 @@
 				"set_active_solution",
 				"start_background_task",
 				"trust_solution",
-				"unload_solution"
+				"unload_solution",
+				"get_nuget_dependencies",
+				"revoke_trust"
 			]
 		}
 	}
