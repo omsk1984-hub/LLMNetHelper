@@ -191,7 +191,7 @@ public sealed class NativeAgentOrchestrator : IAgentOrchestrator
                 return FixPlan.Empty;
             }
 
-            return TryParseFixPlan(text) ?? FixPlan.Empty;
+            return FixPlanParser.TryParse(text) ?? FixPlan.Empty;
         }
         catch (OperationCanceledException)
         {
@@ -334,75 +334,6 @@ public sealed class NativeAgentOrchestrator : IAgentOrchestrator
     /// <c>{"tool":"docs_search","arguments":{"query":"..."}}</c>
     /// либо <c>{"tool":"docs_search","arguments":"{\"query\":\"...\"}"}</c>
     /// </summary>
-    /// <summary>
-    /// Разбор плана правки.
-    /// </summary>
-    private static FixPlan? TryParseFixPlan(string text)
-    {
-        var json = JsonText.Extract(text);
-        if (json is null)
-        {
-            return null;
-        }
-
-        try
-        {
-            using var doc = JsonDocument.Parse(json);
-            var root = doc.RootElement;
-
-            var rationale = GetString(root, "rationale", "");
-            var requiresReview = root.TryGetProperty("requires_manual_review", out var r) &&
-                                 r.ValueKind is JsonValueKind.True or JsonValueKind.False &&
-                                 r.GetBoolean();
-
-            var changes = new List<ProposedChange>();
-            if (root.TryGetProperty("changes", out var cArr) && cArr.ValueKind == JsonValueKind.Array)
-            {
-                foreach (var c in cArr.EnumerateArray())
-                {
-                    var filePath = GetString(c, "file_path", "");
-                    var symbol = GetString(c, "symbol_name", "");
-                    // План 22, этап 1.3: change_kind — перечисление; нераспознанный
-                    // вид (как и пустая строка раньше) приводит к пропуску правки.
-                    var kind = ChangeKindFormat.Parse(GetString(c, "change_kind", ""));
-                    var newCode = GetString(c, "new_code", "");
-
-                    if (string.IsNullOrWhiteSpace(filePath) ||
-                        string.IsNullOrWhiteSpace(symbol) ||
-                        kind == ChangeKind.Unknown)
-                    {
-                        continue;
-                    }
-
-                    changes.Add(new ProposedChange(
-                        filePath,
-                        symbol,
-                        kind,
-                        newCode,
-                        GetString(c, "explanation", "")));
-                }
-            }
-
-            var risks = new List<string>();
-            if (root.TryGetProperty("risks", out var risksArr) && risksArr.ValueKind == JsonValueKind.Array)
-            {
-                foreach (var risk in risksArr.EnumerateArray())
-                {
-                    if (risk.ValueKind == JsonValueKind.String)
-                    {
-                        risks.Add(risk.GetString() ?? "");
-                    }
-                }
-            }
-
-            return new FixPlan(rationale, changes, risks, requiresReview);
-        }
-        catch (JsonException)
-        {
-            return null;
-        }
-    }
-
     private static string GetString(JsonElement element, string property, string fallback)
     {
         return element.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.String
