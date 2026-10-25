@@ -92,7 +92,9 @@ public sealed class GenerateReportStep : IRunStep
             reportBase, analysis.Verdict);
     }
 
-    private static AnalysisResult BuildAnalysis(Diagnosis diagnosis)
+    // internal для сквозных тестов отчётности (InternalsVisibleTo LLMNetHelper.Tests):
+    // критерий готовности 0.1 — находки обязаны доходить до строк Markdown/JSON отчёта.
+    internal static AnalysisResult BuildAnalysis(Diagnosis diagnosis)
     {
         return new AnalysisResult
         {

@@ -362,7 +362,7 @@ public class NativeAgentOrchestratorTests
     [Fact]
     public async Task Diagnose_CriticalVerdictWithoutCriticalFinding_IsDowngraded()
     {
-        // Обратная方向 коррекции: CRITICAL без critical-находки → WARNING
+        // Обратная сторона коррекции: CRITICAL без critical-находки → WARNING
         // (та же семантика, что в ResponseParser.ValidateVerdict).
         var chat = new ScriptedChatClient("""
             {
