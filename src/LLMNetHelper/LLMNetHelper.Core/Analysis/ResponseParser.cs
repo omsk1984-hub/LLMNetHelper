@@ -38,7 +38,8 @@ public static class ResponseParser
         {
             try
             {
-                var doc = JsonDocument.Parse(jsonText);
+                // Дефект N3 (план 22): JsonDocument — IDisposable, обязателен using.
+                using var doc = JsonDocument.Parse(jsonText);
                 ParseJsonObject(doc.RootElement, result);
                 ValidateVerdict(result);
                 return result;
@@ -57,7 +58,8 @@ public static class ResponseParser
             {
                 try
                 {
-                    var doc = JsonDocument.Parse(extractedJson);
+                    // Дефект N3 (план 22): JsonDocument — IDisposable, обязателен using.
+                    using var doc = JsonDocument.Parse(extractedJson);
                     ParseJsonObject(doc.RootElement, result);
                     ValidateVerdict(result);
                     return result;

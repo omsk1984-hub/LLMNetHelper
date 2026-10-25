@@ -48,11 +48,18 @@ public sealed class LokiHttpClient : ILokiClient
         try
         {
             var url = $"/loki/api/v1/query?query={Uri.EscapeDataString(query)}";
-            var response = await _http.GetAsync(url, ct);
-            response.EnsureSuccessStatusCode();
+            // Дефект N3 (план 22): ответ и документ освобождаются через using.
+            // EnsureSuccessStatusCode заменён явной проверкой: результат метода
+            // не отбрасывается (DisposableDiscarded) и using-переменная не переприсваивается.
+            using var response = await _http.GetAsync(url, ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new HttpRequestException(
+                    $"/loki/api/v1/query: status code {(int)response.StatusCode} ({response.ReasonPhrase}).");
+            }
 
             var json = await response.Content.ReadAsStringAsync(ct);
-            var doc = JsonDocument.Parse(json);
+            using var doc = JsonDocument.Parse(json);
             var root = doc.RootElement;
 
             if (root.TryGetProperty("data", out var data) &&
@@ -141,11 +148,16 @@ public sealed class LokiHttpClient : ILokiClient
             var url = $"/loki/api/v1/query_range?query={Uri.EscapeDataString(query)}" +
                       $"&start={startNs}&end={endNs}" +
                       $"&limit={limit}&direction=backward";
-            var response = await _http.GetAsync(url, ct);
-            response.EnsureSuccessStatusCode();
+            // Дефект N3 (план 22): ответ и документ освобождаются через using.
+            using var response = await _http.GetAsync(url, ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new HttpRequestException(
+                    $"/loki/api/v1/query_range: status code {(int)response.StatusCode} ({response.ReasonPhrase}).");
+            }
 
             var json = await response.Content.ReadAsStringAsync(ct);
-            var doc = JsonDocument.Parse(json);
+            using var doc = JsonDocument.Parse(json);
             var root = doc.RootElement;
 
             var entries = new List<Dictionary<string, object>>();
@@ -191,7 +203,8 @@ public sealed class LokiHttpClient : ILokiClient
     {
         try
         {
-            var response = await _http.GetAsync("/loki/api/v1/status/buildinfo", ct);
+            // Дефект N3 (план 22): ответ освобождается через using.
+            using var response = await _http.GetAsync("/loki/api/v1/status/buildinfo", ct);
             return response.IsSuccessStatusCode;
         }
         catch
@@ -204,7 +217,8 @@ public sealed class LokiHttpClient : ILokiClient
     {
         try
         {
-            var response = await _http.GetAsync("/metrics", ct);
+            // Дефект N3 (план 22): ответ освобождается через using.
+            using var response = await _http.GetAsync("/metrics", ct);
             return response.IsSuccessStatusCode
                 ? await response.Content.ReadAsStringAsync(ct)
                 : null;

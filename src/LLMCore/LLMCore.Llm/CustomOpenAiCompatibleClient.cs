@@ -183,7 +183,8 @@ public sealed class CustomOpenAiCompatibleClient : IAnalysisLlmClient
             response.Dispose();
         }
 
-        var doc = JsonDocument.Parse(json);
+        // Дефект N3 (план 22): JsonDocument — IDisposable, обязателен using.
+        using var doc = JsonDocument.Parse(json);
         var root = doc.RootElement;
 
         var text = "";

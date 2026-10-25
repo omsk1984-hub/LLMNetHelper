@@ -29,11 +29,18 @@ public sealed class PrometheusHttpClient : IPrometheusClient
         try
         {
             var url = $"/api/v1/query?query={Uri.EscapeDataString(query)}";
-            var response = await _http.GetAsync(url, ct);
-            response.EnsureSuccessStatusCode();
+            // Дефект N3 (план 22): ответ и документ освобождаются через using.
+            // EnsureSuccessStatusCode заменён явной проверкой (DisposableDiscarded +
+            // запрет переприсваивания using-переменной).
+            using var response = await _http.GetAsync(url, ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new HttpRequestException(
+                    $"/api/v1/query: status code {(int)response.StatusCode} ({response.ReasonPhrase}).");
+            }
 
             var json = await response.Content.ReadAsStringAsync(ct);
-            var doc = JsonDocument.Parse(json);
+            using var doc = JsonDocument.Parse(json);
             var root = doc.RootElement;
 
             if (root.TryGetProperty("data", out var data) &&
@@ -80,11 +87,16 @@ public sealed class PrometheusHttpClient : IPrometheusClient
                       $"query={Uri.EscapeDataString(query)}&" +
                       $"start={fromTs}&end={toTs}&step={stepSec}";
 
-            var response = await _http.GetAsync(url, ct);
-            response.EnsureSuccessStatusCode();
+            // Дефект N3 (план 22): ответ и документ освобождаются через using.
+            using var response = await _http.GetAsync(url, ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new HttpRequestException(
+                    $"/api/v1/query_range: status code {(int)response.StatusCode} ({response.ReasonPhrase}).");
+            }
 
             var json = await response.Content.ReadAsStringAsync(ct);
-            var doc = JsonDocument.Parse(json);
+            using var doc = JsonDocument.Parse(json);
             var root = doc.RootElement;
 
             var points = new List<(string Time, double Value)>();
@@ -166,11 +178,16 @@ public sealed class PrometheusHttpClient : IPrometheusClient
     {
         try
         {
-            var response = await _http.GetAsync("/api/v1/rules?type=alert", ct);
-            response.EnsureSuccessStatusCode();
+            // Дефект N3 (план 22): ответ и документ освобождаются через using.
+            using var response = await _http.GetAsync("/api/v1/rules?type=alert", ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new HttpRequestException(
+                    $"/api/v1/rules: status code {(int)response.StatusCode} ({response.ReasonPhrase}).");
+            }
 
             var json = await response.Content.ReadAsStringAsync(ct);
-            var doc = JsonDocument.Parse(json);
+            using var doc = JsonDocument.Parse(json);
 
             var rules = new List<Dictionary<string, object?>>();
             var root = doc.RootElement;
@@ -207,11 +224,16 @@ public sealed class PrometheusHttpClient : IPrometheusClient
     {
         try
         {
-            var response = await _http.GetAsync("/api/v1/alerts", ct);
-            response.EnsureSuccessStatusCode();
+            // Дефект N3 (план 22): ответ и документ освобождаются через using.
+            using var response = await _http.GetAsync("/api/v1/alerts", ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new HttpRequestException(
+                    $"/api/v1/alerts: status code {(int)response.StatusCode} ({response.ReasonPhrase}).");
+            }
 
             var json = await response.Content.ReadAsStringAsync(ct);
-            var doc = JsonDocument.Parse(json);
+            using var doc = JsonDocument.Parse(json);
 
             var alerts = new List<Dictionary<string, object?>>();
             var root = doc.RootElement;
@@ -241,7 +263,8 @@ public sealed class PrometheusHttpClient : IPrometheusClient
     {
         try
         {
-            var response = await _http.GetAsync("/metrics", ct);
+            // Дефект N3 (план 22): ответ освобождается через using.
+            using var response = await _http.GetAsync("/metrics", ct);
             return response.IsSuccessStatusCode
                 ? await response.Content.ReadAsStringAsync(ct)
                 : null;
