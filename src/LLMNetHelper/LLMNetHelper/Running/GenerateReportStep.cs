@@ -19,19 +19,26 @@ public sealed class GenerateReportStep : IRunStep
     private readonly IOptions<AgentOptions> _agentOptions;
     private readonly IAgentOrchestrator _orchestrator;
     private readonly ILogger<GenerateReportStep> _logger;
+    // План 22, этап 6.2: рендереры через абстракции (подменяемость в тестах).
+    private readonly IMarkdownReportRenderer _markdownRenderer;
+    private readonly IJsonReportRenderer _jsonRenderer;
 
     public GenerateReportStep(
         IReportWriter reportWriter,
         IFactStore factStore,
         IOptions<AgentOptions> agentOptions,
         IAgentOrchestrator orchestrator,
-        ILogger<GenerateReportStep> logger)
+        ILogger<GenerateReportStep> logger,
+        IMarkdownReportRenderer? markdownRenderer = null,
+        IJsonReportRenderer? jsonRenderer = null)
     {
         _reportWriter = reportWriter;
         _factStore = factStore;
         _agentOptions = agentOptions;
         _orchestrator = orchestrator;
         _logger = logger;
+        _markdownRenderer = markdownRenderer ?? new MarkdownReportRenderer();
+        _jsonRenderer = jsonRenderer ?? new JsonReportRenderer();
     }
 
     public async Task ExecuteAsync(RunContext context, CancellationToken ct)
@@ -75,7 +82,7 @@ public sealed class GenerateReportStep : IRunStep
 
         // Дефект N4 (план 22): токены из Diagnosis доходят до рендереров
         // (раньше здесь были жёсткие null).
-        var markdown = MarkdownReportRenderer.Render(
+        var markdown = _markdownRenderer.Render(
             analysis,
             runInfo,
             _orchestrator.ProviderName,
@@ -84,7 +91,7 @@ public sealed class GenerateReportStep : IRunStep
             health: prometheusFacts.MonitoringHealth,
             agentReport: agentReport);
 
-        var json = JsonReportRenderer.Render(
+        var json = _jsonRenderer.Render(
             analysis,
             runInfo,
             _orchestrator.ProviderName,

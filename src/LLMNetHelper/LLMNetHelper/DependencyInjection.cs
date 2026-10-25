@@ -5,6 +5,7 @@ using LLMNetHelper.Chat;
 using LLMNetHelper.CodeChange;
 using LLMNetHelper.Context;
 using LLMNetHelper.Core.Collection;
+using LLMNetHelper.Core.Reporting;
 using LLMNetHelper.Core.Snapshot;
 using LLMNetHelper.Core.Storage;
 using LLMNetHelper.GitLab;
@@ -90,6 +91,10 @@ public static class DependencyInjection
             var options = sp.GetRequiredService<IOptions<AgentOptions>>().Value;
             return new FileReportWriter(options.ReportsDir);
         });
+        // План 22, этап 6.2: форматы отчёта — экземплярные сервисы по интерфейсам
+        // (подмена формата в тестах и верционирование без правки шага прогона).
+        services.AddSingleton<IMarkdownReportRenderer, MarkdownReportRenderer>();
+        services.AddSingleton<IJsonReportRenderer, JsonReportRenderer>();
 
         // --- Внешний контекст: источники регистрируются списком ---
         services.AddContextLayer(contextOptions);

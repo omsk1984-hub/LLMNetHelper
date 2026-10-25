@@ -60,7 +60,7 @@ public class ReportEndToEndTests
     {
         var analysis = GenerateReportStep.BuildAnalysis(DiagnosisWithFindings());
 
-        var markdown = MarkdownReportRenderer.Render(
+        var markdown = new MarkdownReportRenderer().Render(
             analysis, SampleRunInfo(), "native", null, null, null,
             agentReport: AgentReport.Empty with { Orchestrator = "native" });
 
@@ -75,7 +75,7 @@ public class ReportEndToEndTests
     {
         var analysis = GenerateReportStep.BuildAnalysis(DiagnosisWithFindings());
 
-        var json = JsonReportRenderer.Render(
+        var json = new JsonReportRenderer().Render(
             analysis, SampleRunInfo(), "native", null, null, null);
 
         // Валидный JSON-объект (не строка) с массивом findings.

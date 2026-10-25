@@ -6,9 +6,10 @@ using LLMNetHelper.Core.Collection;
 namespace LLMNetHelper.Core.Reporting;
 
 /// <summary>
-/// Markdown-рендерер отчёта.
+/// Markdown-рендерер отчёта (план 22, этап 6.2: экземплярный класс,
+/// реализующий <see cref="IMarkdownReportRenderer"/> — подменяемость в тестах).
 /// </summary>
-public static class MarkdownReportRenderer
+public sealed class MarkdownReportRenderer : IMarkdownReportRenderer
 {
     /// <summary>
     /// Формирует Markdown-отчёт из результатов анализа.
@@ -20,7 +21,7 @@ public static class MarkdownReportRenderer
     /// <param name="completionTokens">Токенов в ответе (может быть null).</param>
     /// <param name="health">Состояние мониторинга (может быть null).</param>
     /// <param name="agentReport">Агентские сведения: гипотезы, контекст, правки.</param>
-    public static string Render(
+    public string Render(
         AnalysisResult analysis,
         RunInfo runInfo,
         string llmProvider,

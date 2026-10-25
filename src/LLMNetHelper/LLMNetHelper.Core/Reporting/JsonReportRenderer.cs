@@ -6,9 +6,10 @@ using System.Text.Json;
 namespace LLMNetHelper.Core.Reporting;
 
 /// <summary>
-/// JSON-рендерер отчёта.
+/// JSON-рендерер отчёта (план 22, этап 6.2: экземплярный класс,
+/// реализующий <see cref="IJsonReportRenderer"/> — подменяемость в тестах).
 /// </summary>
-public static class JsonReportRenderer
+public sealed class JsonReportRenderer : IJsonReportRenderer
 {
     private static readonly JsonSerializerOptions JsonOpts = new()
     {
@@ -20,7 +21,7 @@ public static class JsonReportRenderer
     /// <summary>
     /// Формирует JSON-отчёт из результатов анализа.
     /// </summary>
-    public static string Render(
+    public string Render(
         AnalysisResult analysis,
         RunInfo runInfo,
         string llmProvider,
