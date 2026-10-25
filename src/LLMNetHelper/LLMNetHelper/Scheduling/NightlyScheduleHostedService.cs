@@ -19,16 +19,21 @@ public sealed class NightlyScheduleHostedService : BackgroundService
     private readonly ILogger<NightlyScheduleHostedService> _logger;
     private readonly SemaphoreSlim _semaphore = new(1, 1);
     private readonly TimeProvider _timeProvider;
+    // План 22, этап 2.9: конструкторная инъекция IGitService вместо
+    // GetRequiredService<GitService>() (Service Locator).
+    private readonly IGitService _gitService;
 
     public NightlyScheduleHostedService(
         IServiceProvider serviceProvider,
         IOptions<AgentOptions> options,
         ILogger<NightlyScheduleHostedService> logger,
+        IGitService gitService,
         TimeProvider? timeProvider = null)
     {
         _serviceProvider = serviceProvider;
         _options = options;
         _logger = logger;
+        _gitService = gitService;
         _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
@@ -107,14 +112,15 @@ public sealed class NightlyScheduleHostedService : BackgroundService
             _logger.LogInformation(catchUp ? "Catch-up прогон..." : "Начало ночного прогона...");
 
             // Обновление репозитория перед прогоном.
-            var gitService = _serviceProvider.GetRequiredService<CodeChange.GitService>();
-            var fetched = await gitService.FetchAsync(ct).ConfigureAwait(false);
+            // План 22, этап 2.9: сервис внедрён в конструктор, разрешения через
+            // контейнер здесь больше нет.
+            var fetched = await _gitService.FetchAsync(ct).ConfigureAwait(false);
             _logger.LogInformation(
                 "Git fetch: {Fetched}, catch-up pull: {CatchUp}", fetched, catchUp);
 
             if (catchUp && fetched)
             {
-                var pull = await gitService.PullHardAsync(ct).ConfigureAwait(false);
+                var pull = await _gitService.PullHardAsync(ct).ConfigureAwait(false);
                 if (!pull.Succeeded)
                 {
                     _logger.LogWarning(

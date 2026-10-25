@@ -12,7 +12,7 @@ namespace LLMNetHelper.CodeChange;
 /// ветке; мерж и отправка — вручную.
 /// </para>
 /// </summary>
-public sealed class GitService
+public sealed class GitService : IGitService
 {
     private const int GitTimeoutSeconds = 120;
 

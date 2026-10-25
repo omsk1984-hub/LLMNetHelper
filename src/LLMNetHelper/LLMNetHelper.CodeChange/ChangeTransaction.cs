@@ -83,7 +83,8 @@ public sealed record ChangeOutcome(
 public sealed class ChangeTransaction
 {
     private readonly CodeChangeOptions _options;
-    private readonly GitService _git;
+    // План 22, этап 2.1: зависимость от абстракции IGitService, а не от GitService.
+    private readonly IGitService _git;
     private readonly IBuildRunner _build;
     private readonly AstPatcher _patcher;
     private readonly CompilationValidator _validator;
@@ -92,7 +93,7 @@ public sealed class ChangeTransaction
 
     public ChangeTransaction(
         CodeChangeOptions options,
-        GitService git,
+        IGitService git,
         IBuildRunner build,
         AstPatcher patcher,
         CompilationValidator validator,
