@@ -1,24 +1,17 @@
-using LLMNetHelper.Abstractions;
+using LLMNetHelper.Agent.AgentLoop;
 using LLMNetHelper.Agent.Tools;
-using LLMNetHelper.Core.Analysis;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 
 namespace LLMNetHelper.Chat;
 
 /// <summary>
-/// ReAct-цикл чата для режима <c>/tools</c>.
+/// ReAct-цикл чата для режима <c>/tools</c> (план 22, этап 3.5).
 /// <para>
-/// Повторяет структуру <c>NativeAgentOrchestrator.DiagnoseAsync</c> (парсинг
-/// <c>{"tool":..., "arguments":...}</c>, лимиты шагов/вызовов), но отличается
-/// в двух существенных вещах:
-/// <list type="bullet">
-///   <item>финальный ответ — свободный текст (не JSON-диагноз);</item>
-///   <item>модель получает <b>полный текст</b> результата инструмента, а не
-///   только число символов: в чате без содержимого файлов цикл бессмысленен.</item>
-/// </list>
-/// Белый список сохраняется: инструмент ищется через <see cref="ToolRegistry.Find"/>,
-/// неизвестное имя отклоняется.
+/// Тонкий адаптер над общим движком <see cref="ReActLoopEngine"/> с
+/// <see cref="ChatReActStrategy"/>: финальный ответ — свободный текст,
+/// модель получает полный текст результата инструмента, лимиты/сбои —
+/// прежние формулировки. Транскрипт и логи ведёт приватный наблюдатель.
 /// </para>
 /// </summary>
 public sealed class ChatAgentLoop
@@ -52,115 +45,70 @@ public sealed class ChatAgentLoop
         messages.Add(new ChatMessage(ChatRole.User, question));
         _transcript.LogUserMessage(question);
 
-        var toolCalls = 0;
+        var engine = new ReActLoopEngine();
+        var strategy = new ChatReActStrategy(_registry);
 
-        for (var step = 0; step < _options.MaxSteps; step++)
-        {
-            ct.ThrowIfCancellationRequested();
+        var outcome = await engine.RunAsync(
+            _chat,
+            messages,
+            strategy,
+            new ReActOptions(_options.MaxSteps, _options.ToolCallLimit),
+            new TranscriptObserver(_transcript, _logger),
+            ct).ConfigureAwait(false);
 
-            string? responseText;
-            int? inputTokens = null;
-            int? outputTokens = null;
-
-            try
-            {
-                var response = await _chat.GetResponseAsync(messages, cancellationToken: ct).ConfigureAwait(false);
-                responseText = response.Text;
-
-                // Usage из ответа транспорта (OpenAI-совместимый usage.prompt_tokens/
-                // completion_tokens): CustomLlmChatClient заполняет UsageDetails.
-                // Может отсутствовать (null) — провайдер не вернул токены.
-                if (response.Usage is { } usage)
-                {
-                    inputTokens = usage.InputTokenCount is { } i ? (int)Math.Min(i, int.MaxValue) : null;
-                    outputTokens = usage.OutputTokenCount is { } o ? (int)Math.Min(o, int.MaxValue) : null;
-                }
-            }
-            catch (OperationCanceledException)
-            {
-                throw;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Чат: сбой вызова LLM на шаге {Step}", step);
-                _transcript.LogNote($"[Сбой LLM на шаге {step + 1}: {ex.Message}]");
-                return $"[Сбой LLM: {ex.Message}]";
-            }
-
-            if (string.IsNullOrWhiteSpace(responseText))
-            {
-                _transcript.LogNote("[Модель вернула пустой ответ]");
-                return "[Модель вернула пустой ответ]";
-            }
-
-            if (!ToolCallParser.TryParse(responseText, out var toolName, out var toolArgs))
-            {
-                // Финальный ответ текстом.
-                _transcript.LogAssistantAnswer(responseText, inputTokens, outputTokens);
-                return responseText;
-            }
-
-            if (toolCalls >= _options.ToolCallLimit)
-            {
-                _logger.LogWarning("Чат: достигнут лимит вызовов инструментов ({Limit})", _options.ToolCallLimit);
-                _transcript.LogModelStep(step, responseText, inputTokens, outputTokens);
-                _transcript.LogNote("[Достигнут лимит вызовов инструментов — ответ может быть неполным.]");
-                return responseText + "\n\n[Достигнут лимит вызовов инструментов — ответ может быть неполным.]";
-            }
-
-            _transcript.LogModelStep(step, responseText, inputTokens, outputTokens);
-            _transcript.LogToolCall(step, toolName, toolArgs);
-
-            var (resultText, succeeded) = await InvokeToolAsync(toolName, toolArgs, ct).ConfigureAwait(false);
-            toolCalls++;
-
-            _transcript.LogToolResult(step, toolName, resultText, succeeded);
-
-            _logger.LogInformation(
-                "Чат: инструмент {Tool}: {Chars} символов, успех={Ok}",
-                toolName, resultText.Length, succeeded);
-
-            messages.Add(new ChatMessage(ChatRole.Assistant, responseText));
-            messages.Add(new ChatMessage(ChatRole.User,
-                succeeded
-                    ? $"Результат инструмента `{toolName}`:\n{resultText}"
-                    : $"Инструмент `{toolName}` не выполнен: {resultText}. " +
-                      "Используй только инструменты из системного промпта."));
-        }
-
-        _logger.LogWarning("Чат: достигнут лимит шагов ({Limit})", _options.MaxSteps);
-        _transcript.LogNote("[Достигнут лимит шагов агента — переформулируйте вопрос или отключите /tools.]");
-        return "[Достигнут лимит шагов агента — переформулируйте вопрос или отключите /tools.]";
+        return outcome.ResponseText ?? "[Движок не вернул ответа].";
     }
 
     /// <summary>
-    /// Вызов инструмента из белого списка с возвратом ПОЛНОГО текста результата
-    /// (в отличие от <c>ToolRegistry.InvokeAsync</c>, возвращающего только метрики).
+    /// Наблюдатель: воспроизводит прежние вызовы транскрипта и лог-записи
+    /// (план 22, этап 3.5).
     /// </summary>
-    private async Task<(string ResultText, bool Succeeded)> InvokeToolAsync(
-        string toolName,
-        string argumentsJson,
-        CancellationToken ct)
+    private sealed class TranscriptObserver(IChatTranscript transcript, ILogger<ChatAgentLoop> logger) : IReActObserver
     {
-        var tool = _registry.Find(toolName);
-        if (tool is null)
+        public void OnStepModelResponse(int step, string responseText, int? inputTokens, int? outputTokens)
         {
-            return ($"`{toolName}` не найден в белом списке", false);
+            transcript.LogModelStep(step, responseText, inputTokens, outputTokens);
         }
 
-        try
+        public void OnStepToolCall(int step, string toolName, string argumentsJson)
         {
-            var result = await tool.InvokeAsync(argumentsJson ?? "{}", ct).ConfigureAwait(false);
-            return (result, true);
+            transcript.LogToolCall(step, toolName, argumentsJson);
         }
-        catch (OperationCanceledException)
+
+        public void OnStepToolResult(int step, string toolName, string resultText, bool succeeded)
         {
-            throw;
+            transcript.LogToolResult(step, toolName, resultText, succeeded);
+            logger.LogInformation(
+                "Чат: инструмент {Tool}: {Chars} символов, успех={Ok}",
+                toolName, resultText.Length, succeeded);
         }
-        catch (Exception ex)
+
+        public void OnFinalAnswer(int step, string responseText, int? inputTokens, int? outputTokens)
         {
-            return ($"ошибка: {ex.Message}", false);
+            transcript.LogAssistantAnswer(responseText, inputTokens, outputTokens);
+        }
+
+        public void OnLlmFailure(int step, string message)
+        {
+            logger.LogError("Чат: сбой вызова LLM на шаге {Step}: {Message}", step, message);
+            transcript.LogNote($"[Сбой LLM на шаге {step + 1}: {message}]");
+        }
+
+        public void OnEmptyResponse(int step)
+        {
+            transcript.LogNote("[Модель вернула пустой ответ]");
+        }
+
+        public void OnToolCallLimit(int step)
+        {
+            logger.LogWarning("Чат: достигнут лимит вызовов инструментов");
+            transcript.LogNote("[Достигнут лимит вызовов инструментов — ответ может быть неполным.]");
+        }
+
+        public void OnStepLimit(int step)
+        {
+            logger.LogWarning("Чат: достигнут лимит шагов агента");
+            transcript.LogNote("[Достигнут лимит шагов агента — переформулируйте вопрос или отключите /tools.]");
         }
     }
-
 }

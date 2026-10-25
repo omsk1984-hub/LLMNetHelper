@@ -99,12 +99,36 @@ public interface IReActStrategy
     ReActOutcome OnStepLimitReached(int toolCalls, int? promptTokens, int? completionTokens, int? stepInputTokens = null, int? stepOutputTokens = null);
 }
 
-/// <summary>Наблюдатель за событиями цикла (транскрипт, usage). Все — no-op по умолчанию.</summary>
+/// <summary>
+/// Наблюдатель за событиями цикла (транскрипт, usage). Движок вызывает события в
+/// точках, соответствующих прежним вызовам <c>ChatAgentLoop</c>/<c>DiagnoseAsync</c>,
+/// поэтому транскрипт чата может быть воспроизведён байт-в-байт.
+/// </summary>
 public interface IReActObserver
 {
-    void OnModelResponse(int? inputTokens, int? outputTokens);
-    void OnToolCall(int step, string toolName, string argumentsJson);
-    void OnToolResult(int step, string toolName, string resultText, bool succeeded);
+    /// <summary>Ответ модели, распознанный как запрос инструмента (не финал).</summary>
+    void OnStepModelResponse(int step, string responseText, int? inputTokens, int? outputTokens);
+
+    /// <summary>Вызов инструмента.</summary>
+    void OnStepToolCall(int step, string toolName, string argumentsJson);
+
+    /// <summary>Результат инструмента.</summary>
+    void OnStepToolResult(int step, string toolName, string resultText, bool succeeded);
+
+    /// <summary>Обычный финальный ответ (свободный текст / диагноз).</summary>
+    void OnFinalAnswer(int step, string responseText, int? inputTokens, int? outputTokens);
+
+    /// <summary>Сбой вызова LLM.</summary>
+    void OnLlmFailure(int step, string message);
+
+    /// <summary>Пустой ответ модели.</summary>
+    void OnEmptyResponse(int step);
+
+    /// <summary>Достигнут лимит вызовов инструментов.</summary>
+    void OnToolCallLimit(int step);
+
+    /// <summary>Достигнут лимит шагов.</summary>
+    void OnStepLimit(int step);
 }
 
 /// <summary>No-op наблюдатель, чтобы избежать null-проверок в движке.</summary>
@@ -112,15 +136,35 @@ public sealed class NullReActObserver : IReActObserver
 {
     public static readonly NullReActObserver Instance = new();
 
-    public void OnModelResponse(int? inputTokens, int? outputTokens)
+    public void OnStepModelResponse(int step, string responseText, int? inputTokens, int? outputTokens)
     {
     }
 
-    public void OnToolCall(int step, string toolName, string argumentsJson)
+    public void OnStepToolCall(int step, string toolName, string argumentsJson)
     {
     }
 
-    public void OnToolResult(int step, string toolName, string resultText, bool succeeded)
+    public void OnStepToolResult(int step, string toolName, string resultText, bool succeeded)
+    {
+    }
+
+    public void OnFinalAnswer(int step, string responseText, int? inputTokens, int? outputTokens)
+    {
+    }
+
+    public void OnLlmFailure(int step, string message)
+    {
+    }
+
+    public void OnEmptyResponse(int step)
+    {
+    }
+
+    public void OnToolCallLimit(int step)
+    {
+    }
+
+    public void OnStepLimit(int step)
     {
     }
 }

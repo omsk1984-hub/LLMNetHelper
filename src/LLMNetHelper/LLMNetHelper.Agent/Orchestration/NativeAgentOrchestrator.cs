@@ -147,23 +147,44 @@ public sealed class NativeAgentOrchestrator : IAgentOrchestrator
 
     /// <summary>
     /// Наблюдатель событий цикла: сохраняет диагностику вызовов инструмента,
-    /// которая раньше была в теле цикла (план 22, этап 3.5).
+    /// которая раньше была в теле цикла (план 22, этап 3.5). Остальные события
+    /// для оркестратора не нужны (нет транскрипта) — no-op.
     /// </summary>
     private sealed class LoggingObserver(ILogger<NativeAgentOrchestrator> logger) : IReActObserver
     {
-        public void OnModelResponse(int? inputTokens, int? outputTokens)
+        public void OnStepModelResponse(int step, string responseText, int? inputTokens, int? outputTokens)
         {
         }
 
-        public void OnToolCall(int step, string toolName, string argumentsJson)
+        public void OnStepToolCall(int step, string toolName, string argumentsJson)
         {
         }
 
-        public void OnToolResult(int step, string toolName, string resultText, bool succeeded)
+        public void OnStepToolResult(int step, string toolName, string resultText, bool succeeded)
         {
             logger.LogInformation(
                 "Инструмент {Tool}: {Chars} символов, успех={Ok}",
                 toolName, resultText.Length, succeeded);
+        }
+
+        public void OnFinalAnswer(int step, string responseText, int? inputTokens, int? outputTokens)
+        {
+        }
+
+        public void OnLlmFailure(int step, string message)
+        {
+        }
+
+        public void OnEmptyResponse(int step)
+        {
+        }
+
+        public void OnToolCallLimit(int step)
+        {
+        }
+
+        public void OnStepLimit(int step)
+        {
         }
     }
 }

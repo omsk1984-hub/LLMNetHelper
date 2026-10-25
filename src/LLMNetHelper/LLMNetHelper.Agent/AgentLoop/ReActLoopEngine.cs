@@ -8,7 +8,8 @@ namespace LLMNetHelper.Agent.AgentLoop;
 /// (финал | вызов инструмента)», применяя переданную стратегию для трёх точек
 /// вариации (финализация, исполнение инструмента, формат результата в истории).
 /// Здесь — только общая механика: лимиты шагов/вызовов, отмена, обработка
-/// сбоев LLM, разбор tool-call через общий <see cref="ToolCallParser"/>.
+/// сбоев LLM, разбор tool-call через общий <see cref="ToolCallParser"/> и
+/// уведомление наблюдателя в точках, соответствующих прежним вызовам.
 /// </summary>
 public sealed class ReActLoopEngine : IAgentLoopEngine
 {
@@ -53,8 +54,6 @@ public sealed class ReActLoopEngine : IAgentLoopEngine
                         completionTokens = (completionTokens ?? 0) + stepOutputTokens.Value;
                     }
                 }
-
-                observer.OnModelResponse(promptTokens, completionTokens);
             }
             catch (OperationCanceledException)
             {
@@ -62,22 +61,26 @@ public sealed class ReActLoopEngine : IAgentLoopEngine
             }
             catch (Exception ex)
             {
+                observer.OnLlmFailure(step, ex.Message);
                 return strategy.OnLlmFailure(ex.Message, toolCalls, promptTokens, completionTokens, stepInputTokens, stepOutputTokens);
             }
 
             if (string.IsNullOrWhiteSpace(responseText))
             {
+                observer.OnEmptyResponse(step);
                 return strategy.OnEmptyResponse(toolCalls, promptTokens, completionTokens, stepInputTokens, stepOutputTokens);
             }
 
             if (strategy.TryFinalize(responseText, toolCalls, promptTokens, completionTokens, stepInputTokens, stepOutputTokens, out var finalOutcome))
             {
+                observer.OnFinalAnswer(step, responseText, stepInputTokens, stepOutputTokens);
                 return finalOutcome;
             }
 
             // Ответ не финальный — ожидаем запрос инструмента.
             if (toolCalls >= options.ToolCallLimit)
             {
+                observer.OnToolCallLimit(step);
                 return strategy.OnToolCallLimitReached(responseText, toolCalls, promptTokens, completionTokens, stepInputTokens, stepOutputTokens);
             }
 
@@ -86,22 +89,26 @@ public sealed class ReActLoopEngine : IAgentLoopEngine
                 // Свободный текст без JSON и не распознан как финал — стратегия
                 // решает сама (в оркестраторе уже вернул Fallback в TryFinalize;
                 // здесь недостижимо для корректных стратегий).
-                return strategy.TryFinalize(responseText, toolCalls, promptTokens, completionTokens, stepInputTokens, stepOutputTokens, out var fallbackOutcome)
+                var fallback = strategy.TryFinalize(responseText, toolCalls, promptTokens, completionTokens, stepInputTokens, stepOutputTokens, out var fallbackOutcome)
                     ? fallbackOutcome
                     : strategy.OnEmptyResponse(toolCalls, promptTokens, completionTokens, stepInputTokens, stepOutputTokens);
+                observer.OnFinalAnswer(step, responseText, stepInputTokens, stepOutputTokens);
+                return fallback;
             }
 
-            observer.OnToolCall(step, toolName, toolArgs);
+            observer.OnStepModelResponse(step, responseText, stepInputTokens, stepOutputTokens);
+            observer.OnStepToolCall(step, toolName, toolArgs);
 
             var (resultText, succeeded) = await strategy.InvokeToolAsync(toolName, toolArgs, ct).ConfigureAwait(false);
             toolCalls++;
 
-            observer.OnToolResult(step, toolName, resultText, succeeded);
+            observer.OnStepToolResult(step, toolName, resultText, succeeded);
 
             messages.Add(new ChatMessage(ChatRole.Assistant, responseText));
             messages.Add(new ChatMessage(ChatRole.User, strategy.FormatToolResult(toolName, resultText, succeeded)));
         }
 
+        observer.OnStepLimit(options.MaxSteps);
         return strategy.OnStepLimitReached(toolCalls, promptTokens, completionTokens);
     }
 }
