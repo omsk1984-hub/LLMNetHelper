@@ -49,17 +49,20 @@ public sealed class AgentRunner : IAgentRunner
     private readonly IOptions<AgentOptions> _options;
     private readonly IAgentPipeline _pipeline;
     private readonly IFactStore _factStore;
+    private readonly IToolRegistry _toolRegistry;
     private readonly ILogger<AgentRunner> _logger;
 
     public AgentRunner(
         IOptions<AgentOptions> options,
         IAgentPipeline pipeline,
         IFactStore factStore,
+        IToolRegistry toolRegistry,
         ILogger<AgentRunner> logger)
     {
         _options = options;
         _pipeline = pipeline;
         _factStore = factStore;
+        _toolRegistry = toolRegistry;
         _logger = logger;
     }
 
@@ -74,6 +77,10 @@ public sealed class AgentRunner : IAgentRunner
         // Окно анализа — всегда по UTC.
         var windowTo = DateTime.UtcNow;
         var windowFrom = since ?? windowTo.AddHours(-(hours ?? _options.Value.WindowHours));
+
+        // Дефект D4 (план 18): реестр инструментов — singleton, журнал вызовов
+        // обязан обнуляться в начале каждого прогона.
+        _toolRegistry.Reset();
 
         // Корреляция логов с прогоном
         using (LogContext.PushProperty("RunId", (long?)null))

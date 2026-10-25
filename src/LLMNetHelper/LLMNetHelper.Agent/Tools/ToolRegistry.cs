@@ -128,4 +128,14 @@ public sealed class ToolRegistry : IToolRegistry
             _calls.Add(record);
         }
     }
+
+    /// <inheritdoc />
+    public void Reset()
+    {
+        // Дефект D4 (план 18): singleton накапливает журнал между прогонами.
+        lock (_lock)
+        {
+            _calls.Clear();
+        }
+    }
 }

@@ -395,6 +395,20 @@ public class ToolRegistryTests
         Assert.Contains("alpha", text);
         Assert.Contains("beta", text);
     }
+
+    [Fact]
+    public async Task Reset_ClearsCallJournal()
+    {
+        // Дефект D4 (план 18): ToolRegistry зарегистрирован singleton и накапливает
+        // _calls между прогонами — журнал одного прогона подмешивается в следующий.
+        var registry = new ToolRegistry([new Tool("a")]);
+
+        await registry.InvokeAsync("a", "{}");
+        Assert.Single(registry.Calls);
+
+        registry.Reset();
+        Assert.Empty(registry.Calls);
+    }
 }
 
 /// <summary>

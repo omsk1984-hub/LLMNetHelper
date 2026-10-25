@@ -48,4 +48,11 @@ public interface IToolRegistry
         string toolName,
         string argumentsJson,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Сбрасывает журнал вызовов инструментов. Вызывается в начале каждого
+    /// прогона: реестр — singleton, и без сброса журнал одного прогона
+    /// подмешивается в следующий (дефект D4, план 18).
+    /// </summary>
+    void Reset();
 }
