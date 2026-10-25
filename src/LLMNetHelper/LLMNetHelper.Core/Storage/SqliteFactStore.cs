@@ -27,6 +27,11 @@ public sealed class SqliteFactStore : IFactStore
     private readonly string _connectionString;
     private readonly string _migrationSql;
 
+    // План 22, этап 2.7: инициализация — внутренняя деталь реализации.
+    // Применяется лениво при первой операции (временно́е зацепление устранено).
+    private volatile bool _initialized;
+    private readonly SemaphoreSlim _initGate = new(1, 1);
+
     public SqliteFactStore(string databasePath)
     {
         EnsureProvider();
@@ -34,20 +39,47 @@ public sealed class SqliteFactStore : IFactStore
         _migrationSql = LoadMigrationSql();
     }
 
-    public async Task InitializeAsync(CancellationToken ct = default)
+    /// <summary>
+    /// Инициализация (WAL + миграции). Больше НЕ часть контракта
+    /// <see cref="IFactStore"/> (план 22, этап 2.7); публичный метод оставлен
+    /// для явного прогрева в тестах. Идемпотентен и потокобезопасен.
+    /// </summary>
+    public Task InitializeAsync(CancellationToken ct = default) => EnsureInitializedAsync(ct);
+
+    private async Task EnsureInitializedAsync(CancellationToken ct)
     {
-        using var conn = new SqliteConnection(_connectionString);
-        await conn.OpenAsync(ct);
+        if (_initialized)
+        {
+            return;
+        }
 
-        // Включаем WAL-режим
-        using var walCmd = conn.CreateCommand();
-        walCmd.CommandText = "PRAGMA journal_mode=WAL;";
-        await walCmd.ExecuteNonQueryAsync(ct);
+        await _initGate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            if (_initialized)
+            {
+                return;
+            }
 
-        // Применяем миграции
-        using var migrateCmd = conn.CreateCommand();
-        migrateCmd.CommandText = _migrationSql;
-        await migrateCmd.ExecuteNonQueryAsync(ct);
+            using var conn = new SqliteConnection(_connectionString);
+            await conn.OpenAsync(ct).ConfigureAwait(false);
+
+            // Включаем WAL-режим
+            using var walCmd = conn.CreateCommand();
+            walCmd.CommandText = "PRAGMA journal_mode=WAL;";
+            await walCmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+
+            // Применяем миграции
+            using var migrateCmd = conn.CreateCommand();
+            migrateCmd.CommandText = _migrationSql;
+            await migrateCmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+
+            _initialized = true;
+        }
+        finally
+        {
+            _initGate.Release();
+        }
     }
 
     // План 22, этап 1.5: DateTime (UTC) ↔ TEXT ISO-8601 — внутри хранилища;
@@ -60,6 +92,7 @@ public sealed class SqliteFactStore : IFactStore
 
     public async Task<long> CreateRunAsync(DateTime windowFrom, DateTime windowTo, CancellationToken ct = default)
     {
+        await EnsureInitializedAsync(ct).ConfigureAwait(false);
         using var conn = new SqliteConnection(_connectionString);
         await conn.OpenAsync(ct);
 
@@ -80,6 +113,7 @@ public sealed class SqliteFactStore : IFactStore
     public async Task FinishRunAsync(
         long runId, RunStatus status, Verdict? verdict, string? error, CancellationToken ct = default)
     {
+        await EnsureInitializedAsync(ct).ConfigureAwait(false);
         using var conn = new SqliteConnection(_connectionString);
         await conn.OpenAsync(ct);
 
@@ -103,6 +137,7 @@ public sealed class SqliteFactStore : IFactStore
 
     public async Task SaveLogFactsAsync(long runId, IEnumerable<LogFact> facts, CancellationToken ct = default)
     {
+        await EnsureInitializedAsync(ct).ConfigureAwait(false);
         using var conn = new SqliteConnection(_connectionString);
         await conn.OpenAsync(ct);
 
@@ -140,6 +175,7 @@ public sealed class SqliteFactStore : IFactStore
 
     public async Task SaveErrorSamplesAsync(long runId, IEnumerable<ErrorSample> samples, CancellationToken ct = default)
     {
+        await EnsureInitializedAsync(ct).ConfigureAwait(false);
         using var conn = new SqliteConnection(_connectionString);
         await conn.OpenAsync(ct);
 
@@ -179,6 +215,7 @@ public sealed class SqliteFactStore : IFactStore
 
     public async Task SaveMetricFactsAsync(long runId, IEnumerable<MetricFact> facts, CancellationToken ct = default)
     {
+        await EnsureInitializedAsync(ct).ConfigureAwait(false);
         using var conn = new SqliteConnection(_connectionString);
         await conn.OpenAsync(ct);
 
@@ -218,6 +255,7 @@ public sealed class SqliteFactStore : IFactStore
 
     public async Task SaveLlmRunAsync(long runId, LlmRunInfo info, CancellationToken ct = default)
     {
+        await EnsureInitializedAsync(ct).ConfigureAwait(false);
         using var conn = new SqliteConnection(_connectionString);
         await conn.OpenAsync(ct);
 
@@ -244,6 +282,7 @@ public sealed class SqliteFactStore : IFactStore
 
     public async Task<RunInfo?> GetLastSuccessfulRunAsync(int hoursBack, CancellationToken ct = default)
     {
+        await EnsureInitializedAsync(ct).ConfigureAwait(false);
         using var conn = new SqliteConnection(_connectionString);
         await conn.OpenAsync(ct);
 
@@ -283,6 +322,7 @@ public sealed class SqliteFactStore : IFactStore
     {
         var samples = new List<ErrorSample>();
 
+        await EnsureInitializedAsync(ct).ConfigureAwait(false);
         using var conn = new SqliteConnection(_connectionString);
         await conn.OpenAsync(ct);
 
@@ -318,6 +358,7 @@ public sealed class SqliteFactStore : IFactStore
     {
         var facts = new List<LogFact>();
 
+        await EnsureInitializedAsync(ct).ConfigureAwait(false);
         using var conn = new SqliteConnection(_connectionString);
         await conn.OpenAsync(ct);
 
@@ -348,6 +389,7 @@ public sealed class SqliteFactStore : IFactStore
 
     public async Task<int> PurgeOldRunsAsync(int retentionDays, CancellationToken ct = default)
     {
+        await EnsureInitializedAsync(ct).ConfigureAwait(false);
         using var conn = new SqliteConnection(_connectionString);
         await conn.OpenAsync(ct);
 

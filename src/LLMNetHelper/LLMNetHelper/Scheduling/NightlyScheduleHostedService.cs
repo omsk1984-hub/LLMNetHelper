@@ -128,10 +128,8 @@ public sealed class NightlyScheduleHostedService : BackgroundService
                 }
             }
 
-            // Хранилище и агент — синглтоны; scope нужен для будущих scoped-зависимостей.
-            var factStore = _serviceProvider.GetRequiredService<Abstractions.IFactStore>();
-            await factStore.InitializeAsync(ct);
-
+            // План 22, этап 2.7: инициализация хранилища — внутренняя деталь
+            // реализации (ленивая); ручной вызов InitializeAsync больше не нужен.
             var runner = _serviceProvider.GetRequiredService<IAgentRunner>();
 
             var exitCode = await runner.RunAsync(

@@ -99,9 +99,8 @@ internal static class Program
 
                 var agentRunner = host.Services.GetRequiredService<IAgentRunner>();
 
-                // Инициализация хранилища (WAL + миграции) обязательна ДО первого прогона.
-                var factStore = host.Services.GetRequiredService<Abstractions.IFactStore>();
-                await factStore.InitializeAsync(CancellationToken.None);
+                // План 22, этап 2.7: инициализация хранилища — внутренняя деталь
+                // реализации (ленивая); ручной вызов InitializeAsync больше не нужен.
 
                 try
                 {

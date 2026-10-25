@@ -131,10 +131,10 @@ public class GenerateReportStepPreconditionTests
 
     /// <summary>
     /// Минимальный IFactStore: шаг отчёта вызывает только PurgeOldRunsAsync и FinishRunAsync.
+    /// План 22, этап 2.7: InitializeAsync и IDisposable убраны из контракта.
     /// </summary>
     private sealed class NoopFactStore : IFactStore
     {
-        public Task InitializeAsync(CancellationToken ct = default) => Task.CompletedTask;
         public Task<long> CreateRunAsync(DateTime windowFrom, DateTime windowTo, CancellationToken ct = default) => Task.FromResult(1L);
         public Task FinishRunAsync(long runId, RunStatus status, Verdict? verdict, string? error, CancellationToken ct = default) => Task.CompletedTask;
         public Task SaveLogFactsAsync(long runId, IEnumerable<LogFact> facts, CancellationToken ct = default) => Task.CompletedTask;
@@ -145,6 +145,5 @@ public class GenerateReportStepPreconditionTests
         public Task<List<ErrorSample>> GetPreviousErrorSamplesAsync(long runId, CancellationToken ct = default) => Task.FromResult(new List<ErrorSample>());
         public Task<List<LogFact>> GetPreviousLogFactsAsync(long runId, CancellationToken ct = default) => Task.FromResult(new List<LogFact>());
         public Task<int> PurgeOldRunsAsync(int retentionDays, CancellationToken ct = default) => Task.FromResult(0);
-        public void Dispose() { }
     }
 }
