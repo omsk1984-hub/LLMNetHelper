@@ -184,19 +184,19 @@ flowchart LR
 `dotnet test src/LLMNetHelper/LLMNetHelper.slnx`
 и отдельным коммитом. Порядок этапов обязателен (зависимости — в разделе 4).
 
-### Этап 0 — Неотложные дефекты (P0, без изменения структуры)
+### Этап 0 — Неотложные дефекты (P0, без изменения структуры) — ЗАВЕРШЁН 2026-10-25
 
 **Цель:** восстановить корректность данных в отчётах и устранить риски
 стабильности, не меняя архитектуру.
 
-| # | Изменение | Файлы |
-|---|---|---|
-| 0.1 | Перенести `Finding` из [`ResponseParser.cs`](src/LLMNetHelper/LLMNetHelper.Core/Analysis/ResponseParser.cs:21) в `LLMNetHelper.Abstractions` (чистая record-модель без логики). В [`TryParseDiagnosis`](src/LLMNetHelper/LLMNetHelper.Agent/Orchestration/NativeAgentOrchestrator.cs:249) маппить элементы `findings` сразу в `Finding` (переиспользовать логику [`ParseJsonObject`](src/LLMNetHelper/LLMNetHelper.Core/Analysis/ResponseParser.cs:102) через общий статический маппер). Изменить тип `Diagnosis.Findings` на `IReadOnlyList<Finding>`; в [`BuildAnalysis`](src/LLMNetHelper/LLMNetHelper/Running/GenerateReportStep.cs:95) убрать фильтр `is Finding` | Abstractions, Agent, Running |
-| 0.2 | Устранить D2: изменить контракт [`IReportWriter.WriteJsonAsync`](src/LLMNetHelper/LLMNetHelper.Abstractions/IReportWriter.cs:16) на приём готовой строки (`string json`) либо передавать в него объект до сериализации. Единственный вызывающий — [`GenerateReportStep:84`](src/LLMNetHelper/LLMNetHelper/Running/GenerateReportStep.cs:84) | Abstractions, Infrastructure, Running |
-| 0.3 | Устранить D3: [`ParseResponse`](src/LLMCore/LLMCore.Llm/CustomOpenAiCompatibleClient.cs:149) → `async`, заменить `.Result` на `await ReadAsStringAsync()` | LLMCore.Llm |
-| 0.4 | Устранить D4: добавить `ToolRegistry.Reset()` и вызывать его в начале прогона в [`AgentRunner.RunAsync`](src/LLMNetHelper/LLMNetHelper/AgentRunner.cs:67) (минимальная правка; полное решение — этап 2) | Agent, хост |
-| 0.5 | Устранить D5: применить валидацию вердикта к `Diagnosis` (переиспользовать [`ValidateVerdict`](src/LLMNetHelper/LLMNetHelper.Core/Analysis/ResponseParser.cs:177)) в [`BuildAnalysis`](src/LLMNetHelper/LLMNetHelper/Running/GenerateReportStep.cs:95) или в оркестраторе | Agent/Running |
-| 0.6 | Устранить D7: переименовать `WriteSnapshotAsync` → `WriteTextAsync` (семантически нейтральный метод записи текста) | Abstractions, Infrastructure, Running |
+| # | Изменение | Файлы | Статус |
+|---|---|---|---|
+| 0.1 | Перенести `Finding` из [`ResponseParser.cs`](src/LLMNetHelper/LLMNetHelper.Core/Analysis/ResponseParser.cs:21) в `LLMNetHelper.Abstractions` (чистая record-модель без логики). В [`TryParseDiagnosis`](src/LLMNetHelper/LLMNetHelper.Agent/Orchestration/NativeAgentOrchestrator.cs:249) маппить элементы `findings` сразу в `Finding` (переиспользовать логику [`ParseJsonObject`](src/LLMNetHelper/LLMNetHelper.Core/Analysis/ResponseParser.cs:102) через общий статический маппер). Изменить тип `Diagnosis.Findings` на `IReadOnlyList<Finding>`; в [`BuildAnalysis`](src/LLMNetHelper/LLMNetHelper/Running/GenerateReportStep.cs:95) убрать фильтр `is Finding` | Abstractions, Agent, Running | [x] коммит `537596c`, тест `Diagnose_WithFindings_PreservesTypedFindings` |
+| 0.2 | Устранить D2: изменить контракт [`IReportWriter.WriteJsonAsync`](src/LLMNetHelper/LLMNetHelper.Abstractions/IReportWriter.cs:16) на приём готовой строки (`string json`) либо передавать в него объект до сериализации. Единственный вызывающий — [`GenerateReportStep:84`](src/LLMNetHelper/LLMNetHelper/Running/GenerateReportStep.cs:84) | Abstractions, Infrastructure, Running | [x] коммит `1b65193`, тест `WriteJsonAsync_GivenJsonString_WritesObjectNotQuotedString` |
+| 0.3 | Устранить D3: [`ParseResponse`](src/LLMCore/LLMCore.Llm/CustomOpenAiCompatibleClient.cs:149) → `async`, заменить `.Result` на `await ReadAsStringAsync()` | LLMCore.Llm | [x] коммит `e5bc799` (MCP `convert_to_async` + ручная доводка CancellationToken) |
+| 0.4 | Устранить D4: добавить `ToolRegistry.Reset()` и вызывать его в начале прогона в [`AgentRunner.RunAsync`](src/LLMNetHelper/LLMNetHelper/AgentRunner.cs:67) (минимальная правка; полное решение — этап 2) | Agent, хост | [x] коммит `b197c78`, тест `Reset_ClearsCallJournal`; `Reset()` добавлен в контракт `IToolRegistry` |
+| 0.5 | Устранить D5: применить валидацию вердикта к `Diagnosis` (переиспользовать [`ValidateVerdict`](src/LLMNetHelper/LLMNetHelper.Core/Analysis/ResponseParser.cs:177)) в [`BuildAnalysis`](src/LLMNetHelper/LLMNetHelper/Running/GenerateReportStep.cs:95) или в оркестраторе | Agent/Running | [x] коммит `4ea93a0`: общий `ResponseParser.CorrectVerdict`, тесты `Diagnose_VerdictCorrectedByFindings` / `Diagnose_CriticalVerdictWithoutCriticalFinding_IsDowngraded` |
+| 0.6 | Устранить D7: переименовать `WriteSnapshotAsync` → `WriteTextAsync` (семантически нейтральный метод записи текста) | Abstractions, Infrastructure, Running | [x] коммит `a321a4b` |
 
 **Затронутые области:** отчётность, оркестрация, LLM-транспорт, реестр инструментов.
 
@@ -212,6 +212,19 @@ flowchart LR
 - Вердикты агентских прогонов могут понизиться/повыситься из-за включения валидации (0.5) — поведение станет согласованным с неагентским путём.
 
 **Риски:** низкие. Все правки локальны; 0.1 меняет сигнатуру record `Diagnosis` — все 23 ссылки известны (проверено `find_references`).
+
+**Итог этапа (2026-10-25):**
+- Тесты: `dotnet test src/LLMNetHelper/LLMNetHelper.slnx` → **279 пройдено,
+  10 пропущено (Integration, корректно Skipped), 0 падений**;
+  SK-паритет `LLMCore.Orchestration.SemanticKernel.Tests` → 8/8.
+- `get_diagnostics` (Warning) → 0.
+- Новых тестов: 5 (D1 ×1, D2 ×1, D4 ×1, D5 ×2).
+- Метрики после этапа: `NativeAgentOrchestrator` CC=66 / MI=16 (без изменений —
+  декомпозиция запланирована в этапе 3), `ResponseParser` CC=54 / MI=28
+  (вырос за счёт вынесения `Finding`; дальнейшая чистка — этап 3).
+- Поведение: находки и валидный JSON-объект появились в отчётах; вердикты
+  агентского пути корректируются по находкам (могут отличаться от прежних
+  прогонов — ожидаемое исправление).
 
 ### Этап 1 — Типобезопасность домена и контракты
 
