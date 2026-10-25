@@ -86,8 +86,9 @@ public sealed class ChangeTransaction
     // План 22, этап 2.1: зависимость от абстракции IGitService, а не от GitService.
     private readonly IGitService _git;
     private readonly IBuildRunner _build;
-    private readonly AstPatcher _patcher;
-    private readonly CompilationValidator _validator;
+    // План 22, этап 2.2: зависимости от абстракций IAstPatcher/ICompilationValidator.
+    private readonly IAstPatcher _patcher;
+    private readonly ICompilationValidator _validator;
     private readonly SolutionLoader _loader;
     private readonly ILogger<ChangeTransaction>? _logger;
 
@@ -95,8 +96,8 @@ public sealed class ChangeTransaction
         CodeChangeOptions options,
         IGitService git,
         IBuildRunner build,
-        AstPatcher patcher,
-        CompilationValidator validator,
+        IAstPatcher patcher,
+        ICompilationValidator validator,
         SolutionLoader loader,
         ILogger<ChangeTransaction>? logger = null)
     {

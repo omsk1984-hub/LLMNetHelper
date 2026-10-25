@@ -32,7 +32,8 @@ public sealed record PatchResult(bool Succeeded, string? Reason, Solution? Updat
 /// они ломают вызовы по всему решению.
 /// </para>
 /// </summary>
-public sealed class AstPatcher
+// План 22, этап 2.2: реализация контракта IAstPatcher.
+public sealed class AstPatcher : IAstPatcher
 {
     /// <summary>
     /// Применяет правку к решению.
@@ -214,7 +215,8 @@ public sealed class AstPatcher
 /// <summary>
 /// Проверка компиляции после правки.
 /// </summary>
-public sealed class CompilationValidator
+// План 22, этап 2.2: реализация контракта ICompilationValidator.
+public sealed class CompilationValidator : ICompilationValidator
 {
     /// <summary>
     /// Проверяет, что проект компилируется без ошибок.

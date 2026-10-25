@@ -21,8 +21,9 @@ public static class CodeChangeRegistration
         services.AddSingleton(options);
         // План 22, этап 2.1: регистрация по интерфейсу (единственная реализация — GitService).
         services.AddSingleton<IGitService, GitService>();
-        services.AddSingleton<AstPatcher>();
-        services.AddSingleton<CompilationValidator>();
+        // План 22, этап 2.2: регистрация по интерфейсам IAstPatcher/ICompilationValidator.
+        services.AddSingleton<IAstPatcher, AstPatcher>();
+        services.AddSingleton<ICompilationValidator, CompilationValidator>();
         services.AddSingleton<ChangeTransaction>();
 
         if (buildRunnerFactory is not null)
