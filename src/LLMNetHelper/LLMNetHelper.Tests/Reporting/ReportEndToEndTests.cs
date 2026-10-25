@@ -21,15 +21,15 @@ public class ReportEndToEndTests
             new Finding
             {
                 Id = "F1",
-                Severity = "warning",
+                Severity = FindingSeverity.Warning,
                 Title = "High memory in Writer",
                 Evidence = "RSS growing at 100MB/h",
                 Impact = "OOM risk",
                 Recommendation = "Check for leaks",
-                Confidence = "high"
+                Confidence = Confidence.High
             }
         ],
-        Hypotheses: [new Hypothesis("таймаут Finam", "high", "лог", ["log:1"])],
+        Hypotheses: [new Hypothesis("таймаут Finam", Confidence.High, "лог", ["log:1"])],
         QuestionsForOwner: ["проверить ключ?"],
         ToolCallCount: 2,
         Orchestrator: "native");

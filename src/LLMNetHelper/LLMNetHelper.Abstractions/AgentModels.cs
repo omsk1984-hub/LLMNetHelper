@@ -2,19 +2,26 @@ namespace LLMNetHelper.Abstractions;
 
 /// <summary>
 /// Гипотеза о корневой причине инцидента.
+/// <para>
+/// План 22, этап 1.4: <see cref="Confidence"/> — перечисление; нераспознанное
+/// значение модели сохраняется как <see cref="Confidence.Other"/> с исходной
+/// строкой в <see cref="RawConfidence"/>.
+/// </para>
 /// </summary>
 /// <param name="RootCause">Формулировка причины.</param>
-/// <param name="Confidence">"high" | "medium" | "low".</param>
+/// <param name="Confidence">Уверенность: High | Medium | Low | Other.</param>
 /// <param name="Evidence">Чем подтверждается.</param>
 /// <param name="References">Ссылки на доказательства: лог, метрика, файл:строка.</param>
+/// <param name="RawConfidence">Исходная строка confidence при <see cref="Confidence.Other"/>.</param>
 public sealed record Hypothesis(
     string RootCause,
-    string Confidence,
+    Confidence Confidence,
     string Evidence,
-    IReadOnlyList<string> References)
+    IReadOnlyList<string> References,
+    string? RawConfidence = null)
 {
     /// <summary>Пустая гипотеза-заглушка.</summary>
-    public static Hypothesis Empty { get; } = new("", "low", "", []);
+    public static Hypothesis Empty { get; } = new("", Confidence.Low, "", []);
 }
 
 /// <summary>

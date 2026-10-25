@@ -129,7 +129,8 @@ public static class AgentPromptBuilder
             sb.AppendLine("## Гипотезы");
             foreach (var h in diagnosis.Hypotheses)
             {
-                sb.AppendLine($"- [{h.Confidence}] {h.RootCause}");
+                // План 22, этап 1.4: enum → прежний wire-формат строк.
+                sb.AppendLine($"- [{FindingFormat.ToWire(h.Confidence, h.RawConfidence)}] {h.RootCause}");
                 sb.AppendLine($"  Доказательства: {h.Evidence}");
             }
             sb.AppendLine();

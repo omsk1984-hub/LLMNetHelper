@@ -81,7 +81,8 @@ public static class MarkdownReportRenderer
             {
                 sb.AppendLine($"### {finding.Id}: {finding.Title}");
                 sb.AppendLine();
-                sb.AppendLine($"**Серьёзность:** {finding.Severity} | **Уверенность:** {finding.Confidence}");
+                // План 22, этап 1.4: enum → прежний wire-формат строк.
+                sb.AppendLine($"**Серьёзность:** {FindingFormat.ToWire(finding.Severity, finding.RawSeverity)} | **Уверенность:** {FindingFormat.ToWire(finding.Confidence, finding.RawConfidence)}");
                 sb.AppendLine();
                 sb.AppendLine($"**Доказательство:** {finding.Evidence}");
                 sb.AppendLine();
@@ -155,7 +156,7 @@ public static class MarkdownReportRenderer
 
             foreach (var h in report.Hypotheses)
             {
-                sb.AppendLine($"- **[{h.Confidence}]** {h.RootCause}");
+                sb.AppendLine($"- **[{FindingFormat.ToWire(h.Confidence, h.RawConfidence)}]** {h.RootCause}");
                 sb.AppendLine($"  - Доказательства: {h.Evidence}");
 
                 if (h.References.Count > 0)

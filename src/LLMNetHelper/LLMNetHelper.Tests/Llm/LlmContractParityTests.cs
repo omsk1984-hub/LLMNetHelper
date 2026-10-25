@@ -68,20 +68,20 @@ public class LlmContractParityTests
         var finding = new Finding
         {
             Id = "F1",
-            Severity = "critical",
+            Severity = FindingSeverity.Critical,
             Title = "Test",
             Evidence = "test evidence",
             Impact = "test impact",
             Recommendation = "test rec",
-            Confidence = "high"
+            Confidence = Confidence.High
         };
 
         Assert.Equal("F1", finding.Id);
-        Assert.Equal("critical", finding.Severity);
+        Assert.Equal(FindingSeverity.Critical, finding.Severity);
         Assert.Equal("Test", finding.Title);
         Assert.Equal("test evidence", finding.Evidence);
         Assert.Equal("test impact", finding.Impact);
         Assert.Equal("test rec", finding.Recommendation);
-        Assert.Equal("high", finding.Confidence);
+        Assert.Equal(Confidence.High, finding.Confidence);
     }
 }

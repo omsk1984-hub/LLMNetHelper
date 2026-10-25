@@ -1,3 +1,4 @@
+using LLMNetHelper.Abstractions;
 using LLMNetHelper.Core.Analysis;
 
 namespace LLMNetHelper.Tests.Analysis;
@@ -62,7 +63,8 @@ public class ResponseParserTests
 
         Assert.Equal("UNKNOWN", result.Verdict);
         Assert.Single(result.Findings);
-        Assert.Equal("low", result.Findings[0].Confidence);
+        // План 22, этап 1.4: confidence — перечисление.
+        Assert.Equal(Confidence.Low, result.Findings[0].Confidence);
     }
 
     [Fact]

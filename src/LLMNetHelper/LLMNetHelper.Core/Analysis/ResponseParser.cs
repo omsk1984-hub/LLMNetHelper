@@ -76,12 +76,12 @@ public static class ResponseParser
             result.Findings = [new Finding
             {
                 Id = "F1",
-                Severity = "info",
+                Severity = FindingSeverity.Info,
                 Title = "Ответ неструктурирован",
                 Evidence = textContent.Length > 500 ? textContent.Substring(0, 500) + "..." : textContent,
                 Impact = "Невозно автоматически оценить критичность",
                 Recommendation = "Просмотрите ответ вручную",
-                Confidence = "low"
+                Confidence = Confidence.Low
             }];
             return result;
         }
@@ -143,8 +143,13 @@ public static class ResponseParser
 
         if (findingElem.TryGetProperty("id", out var idProp) && idProp.ValueKind == JsonValueKind.String)
             finding.Id = idProp.GetString() ?? "";
+        // План 22, этап 1.4: severity/confidence — перечисления; нераспознанное
+        // значение сохраняется как Other с исходной строкой.
         if (findingElem.TryGetProperty("severity", out var sevProp) && sevProp.ValueKind == JsonValueKind.String)
-            finding.Severity = sevProp.GetString() ?? "";
+        {
+            finding.Severity = FindingFormat.ParseSeverity(sevProp.GetString(), out var rawSeverity);
+            finding.RawSeverity = rawSeverity;
+        }
         if (findingElem.TryGetProperty("title", out var titleProp) && titleProp.ValueKind == JsonValueKind.String)
             finding.Title = titleProp.GetString() ?? "";
         if (findingElem.TryGetProperty("evidence", out var evProp) && evProp.ValueKind == JsonValueKind.String)
@@ -154,7 +159,10 @@ public static class ResponseParser
         if (findingElem.TryGetProperty("recommendation", out var recProp) && recProp.ValueKind == JsonValueKind.String)
             finding.Recommendation = recProp.GetString() ?? "";
         if (findingElem.TryGetProperty("confidence", out var confProp) && confProp.ValueKind == JsonValueKind.String)
-            finding.Confidence = confProp.GetString() ?? "";
+        {
+            finding.Confidence = FindingFormat.ParseConfidence(confProp.GetString(), out var rawConfidence);
+            finding.RawConfidence = rawConfidence;
+        }
 
         return finding;
     }
@@ -200,8 +208,9 @@ public static class ResponseParser
     /// </summary>
     public static string CorrectVerdict(string verdict, IReadOnlyList<Finding> findings)
     {
-        var hasCritical = findings.Any(f => f.Severity == "critical");
-        var hasWarning = findings.Any(f => f.Severity == "warning");
+        // План 22, этап 1.4: сравнение по enum; Other не влияет на вердикт.
+        var hasCritical = findings.Any(f => f.Severity == FindingSeverity.Critical);
+        var hasWarning = findings.Any(f => f.Severity == FindingSeverity.Warning);
 
         if (hasCritical && verdict != "CRITICAL")
             return "CRITICAL"; // Повышаем: есть critical-находка

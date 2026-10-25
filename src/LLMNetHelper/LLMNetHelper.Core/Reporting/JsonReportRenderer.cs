@@ -40,15 +40,16 @@ public static class JsonReportRenderer
             prompt_tokens = promptTokens,
             completion_tokens = completionTokens,
             fallback_used = analysis.FallbackUsed,
+            // План 22, этап 1.4: enum → прежний wire-формат строк.
             findings = analysis.Findings.Select(f => new
             {
                 f.Id,
-                f.Severity,
+                severity = FindingFormat.ToWire(f.Severity, f.RawSeverity),
                 f.Title,
                 f.Evidence,
                 f.Impact,
                 f.Recommendation,
-                f.Confidence
+                confidence = FindingFormat.ToWire(f.Confidence, f.RawConfidence)
             }).ToArray(),
             noise_candidates = analysis.NoiseCandidates.ToArray(),
             questions_for_owner = analysis.QuestionsForOwner.ToArray(),

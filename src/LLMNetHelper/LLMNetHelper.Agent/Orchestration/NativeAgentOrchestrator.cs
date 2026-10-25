@@ -249,11 +249,17 @@ public sealed class NativeAgentOrchestrator : IAgentOrchestrator
                         }
                     }
 
+                    // План 22, этап 1.4: confidence — перечисление; нераспознанное
+                    // значение сохраняется как Other с исходной строкой.
+                    var confidence = FindingFormat.ParseConfidence(
+                        GetString(h, "confidence", "low"), out var rawConfidence);
+
                     hypotheses.Add(new Hypothesis(
                         GetString(h, "root_cause", ""),
-                        GetString(h, "confidence", "low"),
+                        confidence,
                         GetString(h, "evidence", ""),
-                        refs));
+                        refs,
+                        rawConfidence));
                 }
             }
 

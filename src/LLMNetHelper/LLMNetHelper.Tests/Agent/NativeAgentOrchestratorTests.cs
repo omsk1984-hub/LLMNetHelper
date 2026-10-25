@@ -382,14 +382,15 @@ public class NativeAgentOrchestratorTests
             Assert.IsType<Finding>(f);
         }
 
-        var first = (Finding)diagnosis.Findings[0];
+        var first = diagnosis.Findings[0];
         Assert.Equal("F1", first.Id);
-        Assert.Equal("warning", first.Severity);
+        // План 22, этап 1.4: severity/confidence — перечисления.
+        Assert.Equal(FindingSeverity.Warning, first.Severity);
         Assert.Equal("t1", first.Title);
         Assert.Equal("e1", first.Evidence);
         Assert.Equal("i1", first.Impact);
         Assert.Equal("r1", first.Recommendation);
-        Assert.Equal("high", first.Confidence);
+        Assert.Equal(Confidence.High, first.Confidence);
     }
 
     [Fact]
