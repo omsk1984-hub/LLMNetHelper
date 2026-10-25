@@ -1,6 +1,7 @@
 using LLMNetHelper.Abstractions;
 using LLMNetHelper.Core.Analysis;
 using LLMNetHelper.Core.Collection;
+using LLMNetHelper.Core.Json;
 using System.Text.Json;
 
 namespace LLMNetHelper.Core.Reporting;
@@ -11,12 +12,8 @@ namespace LLMNetHelper.Core.Reporting;
 /// </summary>
 public sealed class JsonReportRenderer : IJsonReportRenderer
 {
-    private static readonly JsonSerializerOptions JsonOpts = new()
-    {
-        PropertyNameCaseInsensitive = false,
-        WriteIndented = true,
-        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
-    };
+    // План 22, этап 6.3: единый профиль отчётов (см. JsonProfiles).
+    private static readonly JsonSerializerOptions JsonOpts = JsonProfiles.Report;
 
     /// <summary>
     /// Формирует JSON-отчёт из результатов анализа.

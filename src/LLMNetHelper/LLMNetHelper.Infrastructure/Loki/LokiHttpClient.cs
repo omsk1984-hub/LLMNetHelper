@@ -1,5 +1,6 @@
 using System.Text.Json;
 using LLMNetHelper.Abstractions;
+using LLMNetHelper.Core.Json;
 using Microsoft.Extensions.Options;
 
 namespace LLMNetHelper.Infrastructure.Loki;
@@ -12,7 +13,8 @@ public sealed class LokiHttpClient : ILokiClient
 {
     private readonly HttpClient _http;
     private readonly LokiOptions _options;
-    private static readonly JsonSerializerOptions JsonOpts = new() { PropertyNameCaseInsensitive = true };
+    // План 22, этап 6.3: единый профиль чтения (см. JsonProfiles).
+    private static readonly JsonSerializerOptions JsonOpts = JsonProfiles.Read;
 
     public LokiHttpClient(IOptions<LokiOptions> options)
     {

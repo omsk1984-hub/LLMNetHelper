@@ -1,4 +1,5 @@
 using LLMNetHelper.Abstractions;
+using LLMNetHelper.Core.Json;
 using System.Text.Json;
 
 namespace LLMNetHelper.Core.Analysis;
@@ -25,7 +26,8 @@ public sealed class AnalysisResult
 /// </summary>
 public static class ResponseParser
 {
-    private static readonly JsonSerializerOptions JsonOpts = new() { PropertyNameCaseInsensitive = true };
+    // План 22, этап 6.3: единый профиль чтения (см. JsonProfiles).
+    private static readonly JsonSerializerOptions JsonOpts = JsonProfiles.Read;
 
     /// <summary>
     /// Парсит ответ LLM.
