@@ -1,5 +1,4 @@
 using System.Text;
-using System.Text.Json;
 using LLMNetHelper.Abstractions;
 
 namespace LLMNetHelper.Infrastructure.Reporting;
@@ -10,12 +9,6 @@ namespace LLMNetHelper.Infrastructure.Reporting;
 public sealed class FileReportWriter : IReportWriter
 {
     private readonly string _reportsDir;
-    private static readonly JsonSerializerOptions JsonOpts = new()
-    {
-        PropertyNameCaseInsensitive = false,
-        WriteIndented = true,
-        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
-    };
 
     public FileReportWriter(string reportsDir)
     {
@@ -29,10 +22,11 @@ public sealed class FileReportWriter : IReportWriter
         await File.WriteAllTextAsync(fullPath, content, Encoding.UTF8, ct);
     }
 
-    public async Task WriteJsonAsync(string path, object data, CancellationToken ct = default)
+    public async Task WriteJsonAsync(string path, string json, CancellationToken ct = default)
     {
+        // Пишем готовую JSON-строку как есть: повторная сериализация
+        // превратила бы объект в экранированную строку (дефект D2, план 18).
         var fullPath = EnsurePath(path);
-        var json = JsonSerializer.Serialize(data, JsonOpts);
         await File.WriteAllTextAsync(fullPath, json, Encoding.UTF8, ct);
     }
 

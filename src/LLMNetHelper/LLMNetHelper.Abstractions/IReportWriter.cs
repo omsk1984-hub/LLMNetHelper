@@ -11,9 +11,12 @@ public interface IReportWriter
     Task WriteMarkdownAsync(string path, string content, CancellationToken ct = default);
 
     /// <summary>
-    /// Записывает JSON-отчёт.
+    /// Записывает JSON-отчёт. Принимает ГОТОВУЮ JSON-строку (например,
+    /// результат <c>JsonReportRenderer.Render</c>) и пишет её как есть.
+    /// Повторная сериализация запрещена — иначе в файл попадёт
+    /// экранированная строка вместо объекта (дефект D2, план 18).
     /// </summary>
-    Task WriteJsonAsync(string path, object data, CancellationToken ct = default);
+    Task WriteJsonAsync(string path, string json, CancellationToken ct = default);
 
     /// <summary>
     /// Записывает snapshot (сводку для LLM).
