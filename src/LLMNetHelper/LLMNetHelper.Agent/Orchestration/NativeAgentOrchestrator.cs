@@ -128,9 +128,11 @@ public sealed class NativeAgentOrchestrator : IAgentOrchestrator
             }
 
             // Пытаемся разобрать как финальный JSON.
-            if (TryParseDiagnosis(responseText, toolCalls, promptTokens, completionTokens, out var diagnosis))
+            var diagnosis = DiagnosisParser.TryParse(
+                responseText, ProviderName, toolCalls, promptTokens, completionTokens);
+            if (diagnosis is not null)
             {
-                return diagnosis!;
+                return diagnosis;
             }
 
             // Иначе — ищем запрос на вызов инструмента.
@@ -217,128 +219,6 @@ public sealed class NativeAgentOrchestrator : IAgentOrchestrator
         }
 
         return $"успешно, {record.ResultChars} символов";
-    }
-
-    /// <summary>
-    /// Разбор финального диагноза.
-    /// </summary>
-    private bool TryParseDiagnosis(
-        string text,
-        int toolCalls,
-        int? promptTokens,
-        int? completionTokens,
-        out Diagnosis? diagnosis)
-    {
-        diagnosis = null;
-
-        var json = JsonText.Extract(text);
-        if (json is null)
-        {
-            return false;
-        }
-
-        try
-        {
-            using var doc = JsonDocument.Parse(json);
-            var root = doc.RootElement;
-
-            if (!root.TryGetProperty("verdict", out _))
-            {
-                return false;
-            }
-
-            var verdict = VerdictFormat.Parse(GetString(root, "verdict", "UNKNOWN"));
-            var summary = GetString(root, "summary", "");
-
-            var hypotheses = new List<Hypothesis>();
-            if (root.TryGetProperty("hypotheses", out var hArr) && hArr.ValueKind == JsonValueKind.Array)
-            {
-                foreach (var h in hArr.EnumerateArray())
-                {
-                    var refs = new List<string>();
-                    if (h.TryGetProperty("references", out var rArr) && rArr.ValueKind == JsonValueKind.Array)
-                    {
-                        foreach (var r in rArr.EnumerateArray())
-                        {
-                            if (r.ValueKind == JsonValueKind.String)
-                            {
-                                refs.Add(r.GetString() ?? "");
-                            }
-                        }
-                    }
-
-                    // План 22, этап 1.4: confidence — перечисление; нераспознанное
-                    // значение сохраняется как Other с исходной строкой.
-                    var confidence = FindingFormat.ParseConfidence(
-                        GetString(h, "confidence", "low"), out var rawConfidence);
-
-                    hypotheses.Add(new Hypothesis(
-                        GetString(h, "root_cause", ""),
-                        confidence,
-                        GetString(h, "evidence", ""),
-                        refs,
-                        rawConfidence));
-                }
-            }
-
-            var questions = new List<string>();
-            if (root.TryGetProperty("questions_for_owner", out var qArr) && qArr.ValueKind == JsonValueKind.Array)
-            {
-                foreach (var q in qArr.EnumerateArray())
-                {
-                    if (q.ValueKind == JsonValueKind.String)
-                    {
-                        questions.Add(q.GetString() ?? "");
-                    }
-                }
-            }
-
-            // Находки маппим сразу в типизированную модель (дефект D1, план 18):
-            // ранее сюда клались сырые JsonElement, которые терялись при
-            // фильтрации `item is Finding` в отчётности.
-            var findings = new List<Finding>();
-            if (root.TryGetProperty("findings", out var fArr) && fArr.ValueKind == JsonValueKind.Array)
-            {
-                foreach (var f in fArr.EnumerateArray())
-                {
-                    findings.Add(ResponseParser.ParseFinding(f));
-                }
-            }
-
-            // Дефект D5 (план 18): вердикт корректируется по находкам тем же
-            // общим правилом, что и в неагентском парсере.
-            verdict = ResponseParser.CorrectVerdict(verdict, findings);
-
-            diagnosis = new Diagnosis(
-                verdict,
-                summary,
-                findings,
-                hypotheses,
-                questions,
-                toolCalls,
-                ProviderName,
-                promptTokens,
-                completionTokens);
-
-            return true;
-        }
-        catch (JsonException)
-        {
-            return false;
-        }
-    }
-
-    /// <summary>
-    /// Разбор запроса на вызов инструмента.
-    /// Ожидаемые формы:
-    /// <c>{"tool":"docs_search","arguments":{"query":"..."}}</c>
-    /// либо <c>{"tool":"docs_search","arguments":"{\"query\":\"...\"}"}</c>
-    /// </summary>
-    private static string GetString(JsonElement element, string property, string fallback)
-    {
-        return element.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.String
-            ? value.GetString() ?? fallback
-            : fallback;
     }
 
     /// <summary>
