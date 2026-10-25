@@ -54,7 +54,7 @@ public class LlmContractParityTests
     {
         var result = new AnalysisResult();
 
-        Assert.Equal("UNKNOWN", result.Verdict);
+        Assert.Equal(Verdict.Unknown, result.Verdict);
         Assert.Equal("", result.Summary);
         Assert.Empty(result.Findings);
         Assert.Empty(result.NoiseCandidates);

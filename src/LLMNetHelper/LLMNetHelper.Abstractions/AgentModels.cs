@@ -62,7 +62,8 @@ public sealed record FixPlan(
 /// <summary>
 /// Результат диагностики инцидента.
 /// </summary>
-/// <param name="Verdict">"OK" | "WARNING" | "CRITICAL" | "UNKNOWN".</param>
+/// <param name="Verdict">Вердикт: Ok | Warning | Critical | Unknown
+/// (план 22, этап 1.1: перечисление вместо магических строк).</param>
 /// <param name="Summary">Краткая сводка.</param>
 /// <param name="Findings">Находки (типизированная модель <see cref="Finding"/>;
 /// ранее — <c>IReadOnlyList<object></c> с сырыми <c>JsonElement</c>, из-за чего
@@ -76,7 +77,7 @@ public sealed record FixPlan(
 /// <c>null</c> — провайдер не вернул usage.</param>
 /// <param name="CompletionTokens">Суммарные токены ответа (см. <paramref name="PromptTokens"/>).</param>
 public sealed record Diagnosis(
-    string Verdict,
+    Verdict Verdict,
     string Summary,
     IReadOnlyList<Finding> Findings,
     IReadOnlyList<Hypothesis> Hypotheses,

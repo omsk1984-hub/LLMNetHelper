@@ -50,7 +50,7 @@ public class GenerateReportStepPreconditionTests
             RunId = 1,
             WindowFrom = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
             WindowTo = new DateTime(2026, 1, 1, 6, 0, 0, DateTimeKind.Utc),
-            Diagnosis = new Diagnosis("OK", "s", [], [], [], 0, "native"),
+            Diagnosis = new Diagnosis(Verdict.Ok, "s", [], [], [], 0, "native"),
             PrometheusFacts = null
         };
 
@@ -74,7 +74,7 @@ public class GenerateReportStepPreconditionTests
             RunId = 1,
             WindowFrom = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
             WindowTo = new DateTime(2026, 1, 1, 6, 0, 0, DateTimeKind.Utc),
-            Diagnosis = new Diagnosis("OK", "s", [], [], [], 0, "native", PromptTokens: 123, CompletionTokens: 45),
+            Diagnosis = new Diagnosis(Verdict.Ok, "s", [], [], [], 0, "native", PromptTokens: 123, CompletionTokens: 45),
             PrometheusFacts = new PrometheusFacts([], [], new MonitoringHealthData())
         };
 
@@ -136,7 +136,7 @@ public class GenerateReportStepPreconditionTests
     {
         public Task InitializeAsync(CancellationToken ct = default) => Task.CompletedTask;
         public Task<long> CreateRunAsync(string windowFrom, string windowTo, CancellationToken ct = default) => Task.FromResult(1L);
-        public Task FinishRunAsync(long runId, string status, string? verdict, string? error, CancellationToken ct = default) => Task.CompletedTask;
+        public Task FinishRunAsync(long runId, string status, Verdict? verdict, string? error, CancellationToken ct = default) => Task.CompletedTask;
         public Task SaveLogFactsAsync(long runId, IEnumerable<LogFact> facts, CancellationToken ct = default) => Task.CompletedTask;
         public Task SaveErrorSamplesAsync(long runId, IEnumerable<ErrorSample> samples, CancellationToken ct = default) => Task.CompletedTask;
         public Task SaveMetricFactsAsync(long runId, IEnumerable<MetricFact> facts, CancellationToken ct = default) => Task.CompletedTask;

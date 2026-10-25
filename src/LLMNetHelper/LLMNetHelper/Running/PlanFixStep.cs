@@ -29,7 +29,7 @@ public sealed class PlanFixStep : IRunStep
     public async Task ExecuteAsync(RunContext context, CancellationToken ct)
     {
         if (_options.EnableFixPlanning is false ||
-            context.Diagnosis?.Verdict is not ("CRITICAL" or "WARNING"))
+            context.Diagnosis?.Verdict is not (Verdict.Critical or Verdict.Warning))
         {
             context.FixPlan = FixPlan.Empty;
             return;

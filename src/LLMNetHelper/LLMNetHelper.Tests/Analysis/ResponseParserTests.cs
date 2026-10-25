@@ -26,7 +26,7 @@ public class ResponseParserTests
 
         var result = ResponseParser.Parse(json, null, false);
 
-        Assert.Equal("WARNING", result.Verdict);
+        Assert.Equal(Verdict.Warning, result.Verdict);
         Assert.Equal("Some issues found", result.Summary);
         Assert.Single(result.Findings);
         Assert.Equal("F1", result.Findings[0].Id);
@@ -50,7 +50,7 @@ public class ResponseParserTests
 
         var result = ResponseParser.Parse(null, text, false);
 
-        Assert.Equal("CRITICAL", result.Verdict);
+        Assert.Equal(Verdict.Critical, result.Verdict);
         Assert.Equal("Server down", result.Summary);
     }
 
@@ -61,7 +61,7 @@ public class ResponseParserTests
 
         var result = ResponseParser.Parse(null, text, true);
 
-        Assert.Equal("UNKNOWN", result.Verdict);
+        Assert.Equal(Verdict.Unknown, result.Verdict);
         Assert.Single(result.Findings);
         // План 22, этап 1.4: confidence — перечисление.
         Assert.Equal(Confidence.Low, result.Findings[0].Confidence);
@@ -89,7 +89,7 @@ public class ResponseParserTests
 
         var result = ResponseParser.Parse(json, null, false);
 
-        Assert.Equal("CRITICAL", result.Verdict); // Понижен/повышен кодом
+        Assert.Equal(Verdict.Critical, result.Verdict); // Понижен/повышен кодом
     }
 
     [Fact]
@@ -97,7 +97,7 @@ public class ResponseParserTests
     {
         var result = ResponseParser.Parse(null, null, false);
 
-        Assert.Equal("UNKNOWN", result.Verdict);
+        Assert.Equal(Verdict.Unknown, result.Verdict);
         Assert.Empty(result.Findings);
     }
 }

@@ -134,7 +134,7 @@ public class NativeAgentOrchestratorTests
 
         var diagnosis = await orchestrator.DiagnoseAsync(Context());
 
-        Assert.Equal("OK", diagnosis.Verdict);
+        Assert.Equal(Verdict.Ok, diagnosis.Verdict);
         Assert.Equal(10, diagnosis.PromptTokens);
         Assert.Equal(5, diagnosis.CompletionTokens);
     }
@@ -180,7 +180,7 @@ public class NativeAgentOrchestratorTests
         var orchestrator = Create(chat, []);
         var diagnosis = await orchestrator.DiagnoseAsync(Context());
 
-        Assert.Equal("WARNING", diagnosis.Verdict);
+        Assert.Equal(Verdict.Warning, diagnosis.Verdict);
         Assert.Single(diagnosis.Hypotheses);
         Assert.Equal("таймаут Finam", diagnosis.Hypotheses[0].RootCause);
         Assert.Equal("native", diagnosis.Orchestrator);
@@ -200,7 +200,7 @@ public class NativeAgentOrchestratorTests
         var orchestrator = Create(chat, []);
         var diagnosis = await orchestrator.DiagnoseAsync(Context());
 
-        Assert.Equal("OK", diagnosis.Verdict);
+        Assert.Equal(Verdict.Ok, diagnosis.Verdict);
     }
 
     [Fact]
@@ -215,7 +215,7 @@ public class NativeAgentOrchestratorTests
         var diagnosis = await orchestrator.DiagnoseAsync(Context());
 
         Assert.Equal(1, tool.Calls);
-        Assert.Equal("OK", diagnosis.Verdict);
+        Assert.Equal(Verdict.Ok, diagnosis.Verdict);
         Assert.Equal(1, diagnosis.ToolCallCount);
         Assert.Equal(2, chat.CallCount);
     }
@@ -234,7 +234,7 @@ public class NativeAgentOrchestratorTests
         var diagnosis = await orchestrator.DiagnoseAsync(Context());
 
         // Инструмент не в белом списке — но прогон не упал.
-        Assert.Equal("WARNING", diagnosis.Verdict);
+        Assert.Equal(Verdict.Warning, diagnosis.Verdict);
         Assert.Contains(registry.Calls, static c => !c.Succeeded);
     }
 
@@ -253,7 +253,7 @@ public class NativeAgentOrchestratorTests
         var orchestrator = Create(chat, [tool], options);
         var diagnosis = await orchestrator.DiagnoseAsync(Context());
 
-        Assert.Equal("UNKNOWN", diagnosis.Verdict);
+        Assert.Equal(Verdict.Unknown, diagnosis.Verdict);
         Assert.Equal(3, tool.Calls);
     }
 
@@ -271,7 +271,7 @@ public class NativeAgentOrchestratorTests
         var diagnosis = await orchestrator.DiagnoseAsync(Context());
 
         // Первый ответ без JSON — фолбэк (UNKNOWN), цикл завершается сразу.
-        Assert.Equal("UNKNOWN", diagnosis.Verdict);
+        Assert.Equal(Verdict.Unknown, diagnosis.Verdict);
     }
 
     [Fact]
@@ -282,7 +282,7 @@ public class NativeAgentOrchestratorTests
 
         var diagnosis = await orchestrator.DiagnoseAsync(Context());
 
-        Assert.Equal("UNKNOWN", diagnosis.Verdict);
+        Assert.Equal(Verdict.Unknown, diagnosis.Verdict);
         Assert.Contains("таймаут", diagnosis.Summary);
         Assert.NotEmpty(diagnosis.QuestionsForOwner);
     }
@@ -295,7 +295,7 @@ public class NativeAgentOrchestratorTests
 
         var diagnosis = await orchestrator.DiagnoseAsync(Context());
 
-        Assert.Equal("UNKNOWN", diagnosis.Verdict);
+        Assert.Equal(Verdict.Unknown, diagnosis.Verdict);
     }
 
     [Fact]
@@ -314,7 +314,7 @@ public class NativeAgentOrchestratorTests
             """);
 
         var orchestrator = Create(chat, []);
-        var diagnosis = new Diagnosis("WARNING", "s", [], [], [], 0, "native");
+        var diagnosis = new Diagnosis(Verdict.Warning, "s", [], [], [], 0, "native");
 
         var plan = await orchestrator.PlanFixAsync(diagnosis, Context());
 
@@ -329,7 +329,7 @@ public class NativeAgentOrchestratorTests
     {
         var chat = new ScriptedChatClient("""{"rationale":"","changes":[],"risks":[]}""");
         var orchestrator = Create(chat, []);
-        var diagnosis = new Diagnosis("OK", "s", [], [], [], 0, "native");
+        var diagnosis = new Diagnosis(Verdict.Ok, "s", [], [], [], 0, "native");
 
         var plan = await orchestrator.PlanFixAsync(diagnosis, Context());
 
@@ -342,7 +342,7 @@ public class NativeAgentOrchestratorTests
         var chat = new ScriptedChatClient("""{"rationale":"x","changes":[]}""");
         var options = new AgentOrchestrationOptions { EnableFixPlanning = false };
         var orchestrator = Create(chat, [], options);
-        var diagnosis = new Diagnosis("OK", "s", [], [], [], 0, "native");
+        var diagnosis = new Diagnosis(Verdict.Ok, "s", [], [], [], 0, "native");
 
         var plan = await orchestrator.PlanFixAsync(diagnosis, Context());
 
@@ -413,7 +413,7 @@ public class NativeAgentOrchestratorTests
         var orchestrator = Create(chat, []);
         var diagnosis = await orchestrator.DiagnoseAsync(Context());
 
-        Assert.Equal("CRITICAL", diagnosis.Verdict);
+        Assert.Equal(Verdict.Critical, diagnosis.Verdict);
     }
 
     [Fact]
@@ -434,7 +434,7 @@ public class NativeAgentOrchestratorTests
         var orchestrator = Create(chat, []);
         var diagnosis = await orchestrator.DiagnoseAsync(Context());
 
-        Assert.Equal("WARNING", diagnosis.Verdict);
+        Assert.Equal(Verdict.Warning, diagnosis.Verdict);
     }
 }
 

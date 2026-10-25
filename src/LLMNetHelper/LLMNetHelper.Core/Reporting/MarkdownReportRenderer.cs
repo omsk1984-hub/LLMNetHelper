@@ -35,7 +35,7 @@ public static class MarkdownReportRenderer
         sb.AppendLine();
 
         // Шапка
-        sb.AppendLine($"**Вердикт:** {GetVerdictEmoji(analysis.Verdict)} {analysis.Verdict}");
+        sb.AppendLine($"**Вердикт:** {GetVerdictEmoji(analysis.Verdict)} {VerdictFormat.ToWire(analysis.Verdict)}");
         sb.AppendLine($"**Запуск:** {runInfo.StartedAt} UTC");
         sb.AppendLine($"**Окно:** {runInfo.WindowFrom} — {runInfo.WindowTo}");
         sb.AppendLine($"**LLM-провайдер:** {llmProvider}");
@@ -230,11 +230,11 @@ public static class MarkdownReportRenderer
         }
     }
 
-    private static string GetVerdictEmoji(string verdict) => verdict switch
+    private static string GetVerdictEmoji(Verdict verdict) => verdict switch
     {
-        "OK" => "✅",
-        "WARNING" => "⚠️",
-        "CRITICAL" => "🔴",
+        Verdict.Ok => "✅",
+        Verdict.Warning => "⚠️",
+        Verdict.Critical => "🔴",
         _ => "❓"
     };
 }

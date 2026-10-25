@@ -111,8 +111,8 @@ public class SeverityConfidenceEnumTests
         var critical = new Finding { Severity = FindingSeverity.Critical };
         var warning = new Finding { Severity = FindingSeverity.Warning };
 
-        Assert.Equal("CRITICAL", ResponseParser.CorrectVerdict("WARNING", [critical]));
-        Assert.Equal("WARNING", ResponseParser.CorrectVerdict("CRITICAL", [warning]));
+        Assert.Equal(Verdict.Critical, ResponseParser.CorrectVerdict(Verdict.Warning, [critical]));
+        Assert.Equal(Verdict.Warning, ResponseParser.CorrectVerdict(Verdict.Critical, [warning]));
     }
 
     /// <summary>
@@ -123,8 +123,8 @@ public class SeverityConfidenceEnumTests
     {
         var other = new Finding { Severity = FindingSeverity.Other, RawSeverity = "fatal" };
 
-        Assert.Equal("OK", ResponseParser.CorrectVerdict("OK", [other]));
-        Assert.Equal("WARNING", ResponseParser.CorrectVerdict("WARNING", [other]));
+        Assert.Equal(Verdict.Ok, ResponseParser.CorrectVerdict(Verdict.Ok, [other]));
+        Assert.Equal(Verdict.Warning, ResponseParser.CorrectVerdict(Verdict.Warning, [other]));
     }
 
     /// <summary>

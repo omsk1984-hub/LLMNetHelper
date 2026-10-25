@@ -107,14 +107,14 @@ public sealed class AgentRunner : IAgentRunner
                     // Dry-run завершается после snapshot (шаг BuildSnapshot проверяет flag)
                     if (dryRun)
                     {
-                        await _factStore.FinishRunAsync(runId, "ok", "OK", null, ct).ConfigureAwait(false);
+                        await _factStore.FinishRunAsync(runId, "ok", Verdict.Ok, null, ct).ConfigureAwait(false);
                         return 0;
                     }
 
-                    var verdict = context.Diagnosis?.Verdict ?? "UNKNOWN";
-                    _logger.LogInformation("Вердикт прогона: {Verdict}", verdict);
+                    var verdict = context.Diagnosis?.Verdict ?? Verdict.Unknown;
+                    _logger.LogInformation("Вердикт прогона: {Verdict}", VerdictFormat.ToWire(verdict));
 
-                    return verdict == "CRITICAL" ? 2 : 0;
+                    return verdict == Verdict.Critical ? 2 : 0;
                 }
                 catch (OperationCanceledException)
                 {

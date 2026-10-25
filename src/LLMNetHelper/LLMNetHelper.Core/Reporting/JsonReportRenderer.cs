@@ -34,7 +34,8 @@ public static class JsonReportRenderer
             started_at = runInfo.StartedAt,
             window_from = runInfo.WindowFrom,
             window_to = runInfo.WindowTo,
-            verdict = analysis.Verdict,
+            // План 22, этап 1.1: enum → прежняя wire-строка отчёта.
+            verdict = VerdictFormat.ToWire(analysis.Verdict),
             summary = analysis.Summary,
             llm_provider = llmProvider,
             prompt_tokens = promptTokens,

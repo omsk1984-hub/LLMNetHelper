@@ -60,8 +60,8 @@ public sealed class RunInfo
     public string? FinishedAt { get; set; }
     public string WindowFrom { get; set; } = "";
     public string WindowTo { get; set; } = "";
-    public string Status { get; set; } = ""; // ok | partial | failed
-    public string? Verdict { get; set; } // OK | WARNING | CRITICAL | UNKNOWN
+    public string Status { get; set; } = ""; // ok | partial | failed (этап 1.2)
+    public Verdict? Verdict { get; set; } // план 22, этап 1.1: перечисление
     public string? LlmProvider { get; set; }
     public string? Error { get; set; }
 }

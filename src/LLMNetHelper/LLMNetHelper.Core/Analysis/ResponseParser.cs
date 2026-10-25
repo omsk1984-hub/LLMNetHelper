@@ -8,7 +8,7 @@ namespace LLMNetHelper.Core.Analysis;
 /// </summary>
 public sealed class AnalysisResult
 {
-    public string Verdict { get; set; } = "UNKNOWN";
+    public Verdict Verdict { get; set; } = Verdict.Unknown;
     public string Summary { get; set; } = "";
     public List<Finding> Findings { get; set; } = [];
     public List<string> NoiseCandidates { get; set; } = [];
@@ -71,7 +71,7 @@ public static class ResponseParser
             }
 
             // Путь 3: Markdown-фолбэк
-            result.Verdict = "UNKNOWN";
+            result.Verdict = Verdict.Unknown;
             result.Summary = "LLM вернул ответ в формате Markdown, структура не распознана.";
             result.Findings = [new Finding
             {
@@ -86,7 +86,7 @@ public static class ResponseParser
             return result;
         }
 
-        result.Verdict = "UNKNOWN";
+        result.Verdict = Verdict.Unknown;
         result.Summary = "LLM не вернул содержимого.";
         return result;
     }
@@ -94,7 +94,7 @@ public static class ResponseParser
     private static void ParseJsonObject(JsonElement root, AnalysisResult result)
     {
         if (root.TryGetProperty("verdict", out var v) && v.ValueKind == JsonValueKind.String)
-            result.Verdict = v.GetString() ?? "UNKNOWN";
+            result.Verdict = VerdictFormat.Parse(v.GetString());
 
         if (root.TryGetProperty("summary", out var s) && s.ValueKind == JsonValueKind.String)
             result.Summary = s.GetString() ?? "";
@@ -206,16 +206,16 @@ public static class ResponseParser
     /// вердикт модели как есть, и одна и та же комбинация находок давала
     /// разный вердикт на разных путях.
     /// </summary>
-    public static string CorrectVerdict(string verdict, IReadOnlyList<Finding> findings)
+    public static Verdict CorrectVerdict(Verdict verdict, IReadOnlyList<Finding> findings)
     {
         // План 22, этап 1.4: сравнение по enum; Other не влияет на вердикт.
         var hasCritical = findings.Any(f => f.Severity == FindingSeverity.Critical);
         var hasWarning = findings.Any(f => f.Severity == FindingSeverity.Warning);
 
-        if (hasCritical && verdict != "CRITICAL")
-            return "CRITICAL"; // Повышаем: есть critical-находка
-        if (!hasCritical && hasWarning && verdict == "CRITICAL")
-            return "WARNING"; // Нет critical → не CRITICAL
+        if (hasCritical && verdict != Verdict.Critical)
+            return Verdict.Critical; // Повышаем: есть critical-находка
+        if (!hasCritical && hasWarning && verdict == Verdict.Critical)
+            return Verdict.Warning; // Нет critical → не CRITICAL
 
         return verdict;
     }

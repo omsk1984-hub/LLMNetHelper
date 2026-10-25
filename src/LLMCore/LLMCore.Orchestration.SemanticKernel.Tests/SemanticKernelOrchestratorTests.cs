@@ -186,7 +186,7 @@ public class SemanticKernelOrchestratorTests
         var native = CreateNative(new ScriptedChatClient(planJson), registry);
         var sk = CreateSk(new ScriptedChatClient(planJson), registry);
 
-        var diagnosis = new Diagnosis("WARNING", "s", [], [], [], 0, "native");
+        var diagnosis = new Diagnosis(Verdict.Warning, "s", [], [], [], 0, "native");
 
         var nativePlan = await native.PlanFixAsync(diagnosis, Context());
         var skPlan = await sk.PlanFixAsync(diagnosis, Context());
@@ -230,8 +230,8 @@ public class SemanticKernelOrchestratorTests
         var nativeDiagnosis = await native.DiagnoseAsync(Context());
         var skDiagnosis = await sk.DiagnoseAsync(Context());
 
-        Assert.Equal("UNKNOWN", nativeDiagnosis.Verdict);
-        Assert.Equal("UNKNOWN", skDiagnosis.Verdict);
+        Assert.Equal(Verdict.Unknown, nativeDiagnosis.Verdict);
+        Assert.Equal(Verdict.Unknown, skDiagnosis.Verdict);
     }
 }
 

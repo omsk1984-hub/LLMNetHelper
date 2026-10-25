@@ -14,7 +14,7 @@ namespace LLMNetHelper.Tests.Reporting;
 public class ReportEndToEndTests
 {
     private static Diagnosis DiagnosisWithFindings() => new(
-        Verdict: "WARNING",
+        Verdict: Verdict.Warning,
         Summary: "рост ошибок в Writer",
         Findings:
         [
@@ -41,7 +41,7 @@ public class ReportEndToEndTests
         WindowFrom = "2026-01-01T00:00:00.0000000Z",
         WindowTo = "2026-01-01T06:00:00.0000000Z",
         Status = "ok",
-        Verdict = "WARNING"
+        Verdict = Verdict.Warning
     };
 
     [Fact]

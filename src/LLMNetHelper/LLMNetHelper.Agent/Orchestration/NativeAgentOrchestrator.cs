@@ -229,7 +229,7 @@ public sealed class NativeAgentOrchestrator : IAgentOrchestrator
                 return false;
             }
 
-            var verdict = GetString(root, "verdict", "UNKNOWN");
+            var verdict = VerdictFormat.Parse(GetString(root, "verdict", "UNKNOWN"));
             var summary = GetString(root, "summary", "");
 
             var hypotheses = new List<Hypothesis>();
@@ -463,7 +463,7 @@ public sealed class NativeAgentOrchestrator : IAgentOrchestrator
         var summary = text.Length > 500 ? text[..500] + "…" : text;
 
         return new Diagnosis(
-            "UNKNOWN",
+            Verdict.Unknown,
             summary.Trim(),
             [],
             [],
@@ -476,6 +476,6 @@ public sealed class NativeAgentOrchestrator : IAgentOrchestrator
 
     private Diagnosis Unknown(string reason, int toolCalls, int? promptTokens, int? completionTokens)
     {
-        return new Diagnosis("UNKNOWN", reason, [], [], [], toolCalls, ProviderName, promptTokens, completionTokens);
+        return new Diagnosis(Verdict.Unknown, reason, [], [], [], toolCalls, ProviderName, promptTokens, completionTokens);
     }
 }

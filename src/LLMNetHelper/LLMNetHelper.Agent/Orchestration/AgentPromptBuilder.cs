@@ -120,7 +120,7 @@ public static class AgentPromptBuilder
         var sb = new StringBuilder();
 
         sb.AppendLine("## Диагноз");
-        sb.AppendLine($"Вердикт: {diagnosis.Verdict}");
+        sb.AppendLine($"Вердикт: {VerdictFormat.ToWire(diagnosis.Verdict)}");
         sb.AppendLine($"Сводка: {diagnosis.Summary}");
         sb.AppendLine();
 
