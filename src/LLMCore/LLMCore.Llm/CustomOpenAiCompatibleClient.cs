@@ -37,6 +37,7 @@ public sealed class CustomOpenAiCompatibleClient : IAnalysisLlmClient
         {
             var plain = await SendWithoutSchemaAsync(request, ct);
             stopwatch.Stop();
+            // Дефект N2 (план 22): ParseResponseAsync принимает владение ответом.
             return await ParseResponseAsync(plain, request, (int)stopwatch.Elapsed.TotalMilliseconds, fallbackUsed, ct);
         }
 
@@ -46,8 +47,11 @@ public sealed class CustomOpenAiCompatibleClient : IAnalysisLlmClient
             stopwatch.Stop();
             return await ParseResponseAsync(response, request, (int)stopwatch.Elapsed.TotalMilliseconds, fallbackUsed, ct);
         }
-        catch (JsonSchemaFallbackException)
+        catch (JsonSchemaFallbackException ex)
         {
+            // Дефект N2 (план 22): 400-ответ, на котором провайдер отверг
+            // json_schema, обязан быть освобождён до повтора без схемы.
+            ex.Response?.Dispose();
             fallbackUsed = true;
             // Retry without JSON schema
             var response2 = await SendWithoutSchemaAsync(request, ct);
@@ -82,9 +86,10 @@ public sealed class CustomOpenAiCompatibleClient : IAnalysisLlmClient
 
         for (var attempt = 0; attempt <= _options.MaxRetries; attempt++)
         {
+            HttpResponseMessage? response = null;
             try
             {
-                var response = await _http.PostAsJsonAsync("/v1/chat/completions", body, ct);
+                response = await _http.PostAsJsonAsync("/v1/chat/completions", body, ct);
 
                 // Ретрай на 429/5xx
                 if (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests ||
@@ -100,18 +105,28 @@ public sealed class CustomOpenAiCompatibleClient : IAnalysisLlmClient
                     {
                         delay = TimeSpan.FromSeconds(Math.Pow(2, attempt));
                     }
+
+                    // Дефект N2 (план 22): ответ перед повтором освобождается.
+                    response.Dispose();
+                    response = null;
                     await Task.Delay(delay, ct);
                     continue;
                 }
 
                 if (response.StatusCode == System.Net.HttpStatusCode.BadRequest)
                 {
-                    // Провайдер не поддерживает json_schema
-                    throw new JsonSchemaFallbackException("Provider rejected json_schema");
+                    // Провайдер не поддерживает json_schema.
+                    // Дефект N2: ответ передаётся исключению, чтобы вызывающий
+                    // (CompleteAsync) освободил его после перехода на фолбэк.
+                    throw new JsonSchemaFallbackException("Provider rejected json_schema", response);
                 }
 
-                response.EnsureSuccessStatusCode();
-                return response;
+                // Присваивание снимает ложное срабатывание DisposableDiscarded:
+                // EnsureSuccessStatusCode возвращает тот же объект.
+                response = response.EnsureSuccessStatusCode();
+                var result = response;
+                response = null; // Владение переходит к вызывающему.
+                return result;
             }
             catch (JsonSchemaFallbackException)
             {
@@ -119,6 +134,8 @@ public sealed class CustomOpenAiCompatibleClient : IAnalysisLlmClient
             }
             catch (Exception)
             {
+                // Дефект N2 (план 22): при сбое попытки ответ освобождается здесь.
+                response?.Dispose();
                 if (attempt == _options.MaxRetries) throw;
                 await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, attempt)), ct);
             }
@@ -142,7 +159,9 @@ public sealed class CustomOpenAiCompatibleClient : IAnalysisLlmClient
         };
 
         var response = await _http.PostAsJsonAsync("/v1/chat/completions", body, ct);
-        response.EnsureSuccessStatusCode();
+        // Дефект N2 (план 22): владение ответом переходит к вызывающему —
+        // ParseResponseAsync освобождает его после чтения контента.
+        response = response.EnsureSuccessStatusCode();
         return response;
     }
 
@@ -150,9 +169,20 @@ public sealed class CustomOpenAiCompatibleClient : IAnalysisLlmClient
         HttpResponseMessage response, LlmRequest request, int durationMs, bool fallbackUsed,
         CancellationToken cancellationToken = default)
     {
+        // Дефект N2 (план 22): метод принимает владение ответом —
+        // освобождает его после чтения контента (finally).
         // Дефект D3 (план 18): ReadAsStringAsync().Result — sync-over-async,
         // риск голодания пула потоков. Теперь полноценный await.
-        var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+        string json;
+        try
+        {
+            json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            response.Dispose();
+        }
+
         var doc = JsonDocument.Parse(json);
         var root = doc.RootElement;
 
@@ -196,6 +226,13 @@ public sealed class CustomOpenAiCompatibleClient : IAnalysisLlmClient
 
     private sealed class JsonSchemaFallbackException : Exception
     {
-        public JsonSchemaFallbackException(string message) : base(message) { }
+        public JsonSchemaFallbackException(string message, HttpResponseMessage? response = null)
+            : base(message)
+        {
+            Response = response;
+        }
+
+        /// <summary>Ответ провайдера, отвергшего json_schema (для освобождения вызывающим).</summary>
+        public HttpResponseMessage? Response { get; }
     }
 }
