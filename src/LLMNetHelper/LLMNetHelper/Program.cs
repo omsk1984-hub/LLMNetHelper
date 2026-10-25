@@ -205,7 +205,8 @@ internal static class Program
                 host.Services.GetRequiredService<ILoggerFactory>(),
                 Console.In,
                 Console.Out,
-                host.Services.GetService<LLMNetHelper.Roslyn.SolutionLoader>(),
+                // План 22, этап 2.4: разрешение по абстракции ISolutionLoader.
+                host.Services.GetService<LLMNetHelper.Roslyn.ISolutionLoader>(),
                 host.Services.GetService<LLMNetHelper.Roslyn.CodeSearchService>(),
                 host.Services.GetService<LLMNetHelper.Roslyn.CallGraphService>(),
                 host.Services.GetService<LLMNetHelper.Roslyn.FailurePointAnalyzer>(),

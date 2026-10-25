@@ -18,7 +18,8 @@ namespace LLMNetHelper.Roslyn;
 /// </list>
 /// </para>
 /// </summary>
-public sealed class SolutionLoader : IDisposable
+// План 22, этап 2.4: реализация контракта ISolutionLoader.
+public sealed class SolutionLoader : ISolutionLoader, IDisposable
 {
     private static readonly object LocatorLock = new();
     private static bool _locatorRegistered;

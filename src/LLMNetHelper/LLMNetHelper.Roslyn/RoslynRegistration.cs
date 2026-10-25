@@ -18,7 +18,8 @@ public static class RoslynRegistration
         RoslynOptions options)
     {
         services.AddSingleton(options);
-        services.AddSingleton<SolutionLoader>();
+        // План 22, этап 2.4: регистрация по интерфейсу ISolutionLoader.
+        services.AddSingleton<ISolutionLoader, SolutionLoader>();
         services.AddSingleton<CodeSearchService>();
         services.AddSingleton<CodeReader>();
         services.AddSingleton<CallGraphService>();

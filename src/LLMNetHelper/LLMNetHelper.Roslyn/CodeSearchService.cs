@@ -10,10 +10,11 @@ namespace LLMNetHelper.Roslyn;
 /// </summary>
 public sealed class CodeSearchService
 {
-    private readonly SolutionLoader _loader;
+    // План 22, этап 2.4: зависимость от абстракции ISolutionLoader.
+    private readonly ISolutionLoader _loader;
     private readonly RoslynOptions _options;
 
-    public CodeSearchService(SolutionLoader loader, RoslynOptions options)
+    public CodeSearchService(ISolutionLoader loader, RoslynOptions options)
     {
         _loader = loader;
         _options = options;

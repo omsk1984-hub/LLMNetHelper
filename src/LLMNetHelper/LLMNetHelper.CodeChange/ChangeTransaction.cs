@@ -89,7 +89,8 @@ public sealed class ChangeTransaction
     // План 22, этап 2.2: зависимости от абстракций IAstPatcher/ICompilationValidator.
     private readonly IAstPatcher _patcher;
     private readonly ICompilationValidator _validator;
-    private readonly SolutionLoader _loader;
+    // План 22, этап 2.4: зависимость от абстракции ISolutionLoader.
+    private readonly ISolutionLoader _loader;
     private readonly ILogger<ChangeTransaction>? _logger;
 
     public ChangeTransaction(
@@ -98,7 +99,7 @@ public sealed class ChangeTransaction
         IBuildRunner build,
         IAstPatcher patcher,
         ICompilationValidator validator,
-        SolutionLoader loader,
+        ISolutionLoader loader,
         ILogger<ChangeTransaction>? logger = null)
     {
         _options = options;

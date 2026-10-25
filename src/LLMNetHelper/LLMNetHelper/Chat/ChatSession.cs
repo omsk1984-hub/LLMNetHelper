@@ -36,7 +36,8 @@ public sealed class ChatSession
     private readonly TextWriter _out;
 
     // Roslyn-слой (опционален: null => инструменты не регистрируются).
-    private readonly SolutionLoader? _solutionLoader;
+    // План 22, этап 2.4: абстракция ISolutionLoader вместо конкретного класса.
+    private readonly ISolutionLoader? _solutionLoader;
     private readonly CodeSearchService? _codeSearch;
     private readonly CallGraphService? _callGraph;
     private readonly FailurePointAnalyzer? _failureAnalyzer;
@@ -54,7 +55,7 @@ public sealed class ChatSession
         ILoggerFactory loggerFactory,
         TextReader @in,
         TextWriter @out,
-        SolutionLoader? solutionLoader = null,
+        ISolutionLoader? solutionLoader = null,
         CodeSearchService? codeSearch = null,
         CallGraphService? callGraph = null,
         FailurePointAnalyzer? failureAnalyzer = null,

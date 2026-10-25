@@ -16,10 +16,11 @@ public sealed class RepoFailurePointsTool : IAgentTool
     internal const int MaxResults = 30;
 
     private readonly ChatScope _scope;
-    private readonly SolutionLoader _loader;
+    // План 22, этап 2.4: абстракция ISolutionLoader вместо конкретного класса.
+    private readonly ISolutionLoader _loader;
     private readonly FailurePointAnalyzer _analyzer;
 
-    public RepoFailurePointsTool(ChatScope scope, SolutionLoader loader, FailurePointAnalyzer analyzer)
+    public RepoFailurePointsTool(ChatScope scope, ISolutionLoader loader, FailurePointAnalyzer analyzer)
     {
         _scope = scope;
         _loader = loader;
