@@ -335,6 +335,50 @@ public class NativeAgentOrchestratorTests
         Assert.Equal("r1", first.Recommendation);
         Assert.Equal("high", first.Confidence);
     }
+
+    [Fact]
+    public async Task Diagnose_VerdictCorrectedByFindings()
+    {
+        // Дефект D5 (план 18): неагентский путь применял ValidateVerdict
+        // (вердикт коррелирует с severity находок), агентский — принимал
+        // вердикт модели как есть. Одна и та же комбинация давала разный
+        // вердикт. Теперь коррекция обязательна на обоих путях.
+        var chat = new ScriptedChatClient("""
+            {
+              "verdict": "OK",
+              "summary": "s",
+              "findings": [
+                { "id": "F1", "severity": "critical", "title": "t" }
+              ]
+            }
+            """);
+
+        var orchestrator = Create(chat, []);
+        var diagnosis = await orchestrator.DiagnoseAsync(Context());
+
+        Assert.Equal("CRITICAL", diagnosis.Verdict);
+    }
+
+    [Fact]
+    public async Task Diagnose_CriticalVerdictWithoutCriticalFinding_IsDowngraded()
+    {
+        // Обратная方向 коррекции: CRITICAL без critical-находки → WARNING
+        // (та же семантика, что в ResponseParser.ValidateVerdict).
+        var chat = new ScriptedChatClient("""
+            {
+              "verdict": "CRITICAL",
+              "summary": "s",
+              "findings": [
+                { "id": "F1", "severity": "warning", "title": "t" }
+              ]
+            }
+            """);
+
+        var orchestrator = Create(chat, []);
+        var diagnosis = await orchestrator.DiagnoseAsync(Context());
+
+        Assert.Equal("WARNING", diagnosis.Verdict);
+    }
 }
 
 public class ToolRegistryTests

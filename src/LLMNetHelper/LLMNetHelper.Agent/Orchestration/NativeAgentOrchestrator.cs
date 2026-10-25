@@ -258,6 +258,10 @@ public sealed class NativeAgentOrchestrator : IAgentOrchestrator
                 }
             }
 
+            // Дефект D5 (план 18): вердикт корректируется по находкам тем же
+            // общим правилом, что и в неагентском парсере.
+            verdict = ResponseParser.CorrectVerdict(verdict, findings);
+
             diagnosis = new Diagnosis(
                 verdict,
                 summary,

@@ -186,13 +186,26 @@ public static class ResponseParser
 
     private static void ValidateVerdict(AnalysisResult result)
     {
-        // Вердикт обязан коррелировать с находками
-        var hasCritical = result.Findings.Any(f => f.Severity == "critical");
-        var hasWarning = result.Findings.Any(f => f.Severity == "warning");
+        result.Verdict = CorrectVerdict(result.Verdict, result.Findings);
+    }
 
-        if (hasCritical && result.Verdict != "CRITICAL")
-            result.Verdict = "CRITICAL"; // Понижаем/повышаем вердикт
-        else if (!hasCritical && hasWarning && result.Verdict == "CRITICAL")
-            result.Verdict = "WARNING"; // Нет critical → не CRITICAL
+    /// <summary>
+    /// Коррекция вердикта по находкам: вердикт обязан коррелировать с
+    /// severity находок. Общий для неагентского парсера и оркестратора
+    /// (план 18, пункт 0.5, дефект D5): раньше агентский путь принимал
+    /// вердикт модели как есть, и одна и та же комбинация находок давала
+    /// разный вердикт на разных путях.
+    /// </summary>
+    public static string CorrectVerdict(string verdict, IReadOnlyList<Finding> findings)
+    {
+        var hasCritical = findings.Any(f => f.Severity == "critical");
+        var hasWarning = findings.Any(f => f.Severity == "warning");
+
+        if (hasCritical && verdict != "CRITICAL")
+            return "CRITICAL"; // Повышаем: есть critical-находка
+        if (!hasCritical && hasWarning && verdict == "CRITICAL")
+            return "WARNING"; // Нет critical → не CRITICAL
+
+        return verdict;
     }
 }
