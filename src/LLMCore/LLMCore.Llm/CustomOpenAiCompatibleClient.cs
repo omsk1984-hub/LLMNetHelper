@@ -1,4 +1,4 @@
-using System.Net.Http.Headers;
+﻿using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using LLMCore.Abstractions;
@@ -37,14 +37,14 @@ public sealed class CustomOpenAiCompatibleClient : IAnalysisLlmClient
         {
             var plain = await SendWithoutSchemaAsync(request, ct);
             stopwatch.Stop();
-            return ParseResponse(plain, request, (int)stopwatch.Elapsed.TotalMilliseconds, fallbackUsed);
+            return await ParseResponseAsync(plain, request, (int)stopwatch.Elapsed.TotalMilliseconds, fallbackUsed, ct);
         }
 
         try
         {
             var response = await SendWithRetriesAsync(request, ct);
             stopwatch.Stop();
-            return ParseResponse(response, request, (int)stopwatch.Elapsed.TotalMilliseconds, fallbackUsed);
+            return await ParseResponseAsync(response, request, (int)stopwatch.Elapsed.TotalMilliseconds, fallbackUsed, ct);
         }
         catch (JsonSchemaFallbackException)
         {
@@ -52,7 +52,7 @@ public sealed class CustomOpenAiCompatibleClient : IAnalysisLlmClient
             // Retry without JSON schema
             var response2 = await SendWithoutSchemaAsync(request, ct);
             stopwatch.Stop();
-            return ParseResponse(response2, request, (int)stopwatch.Elapsed.TotalMilliseconds, true);
+            return await ParseResponseAsync(response2, request, (int)stopwatch.Elapsed.TotalMilliseconds, true, ct);
         }
     }
 
@@ -146,10 +146,13 @@ public sealed class CustomOpenAiCompatibleClient : IAnalysisLlmClient
         return response;
     }
 
-    private LlmCompletion ParseResponse(
-        HttpResponseMessage response, LlmRequest request, int durationMs, bool fallbackUsed)
+    private async Task<LlmCompletion> ParseResponseAsync(
+        HttpResponseMessage response, LlmRequest request, int durationMs, bool fallbackUsed,
+        CancellationToken cancellationToken = default)
     {
-        var json = response.Content.ReadAsStringAsync().Result;
+        // Дефект D3 (план 18): ReadAsStringAsync().Result — sync-over-async,
+        // риск голодания пула потоков. Теперь полноценный await.
+        var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
         var doc = JsonDocument.Parse(json);
         var root = doc.RootElement;
 
