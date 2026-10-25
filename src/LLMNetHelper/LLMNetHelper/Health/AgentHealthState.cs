@@ -8,6 +8,5 @@ public sealed class AgentHealthState
     public string Status { get; set; } = "starting";
     public string? Error { get; set; }
     public DateTime? LastRun { get; set; }
-    public string? LastVerdict { get; set; }
     public int RunCount { get; set; }
 }
