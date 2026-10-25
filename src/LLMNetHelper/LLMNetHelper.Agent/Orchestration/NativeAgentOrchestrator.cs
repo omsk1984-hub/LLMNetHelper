@@ -389,12 +389,14 @@ public sealed class NativeAgentOrchestrator : IAgentOrchestrator
                 {
                     var filePath = GetString(c, "file_path", "");
                     var symbol = GetString(c, "symbol_name", "");
-                    var kind = GetString(c, "change_kind", "");
+                    // План 22, этап 1.3: change_kind — перечисление; нераспознанный
+                    // вид (как и пустая строка раньше) приводит к пропуску правки.
+                    var kind = ChangeKindFormat.Parse(GetString(c, "change_kind", ""));
                     var newCode = GetString(c, "new_code", "");
 
                     if (string.IsNullOrWhiteSpace(filePath) ||
                         string.IsNullOrWhiteSpace(symbol) ||
-                        string.IsNullOrWhiteSpace(kind))
+                        kind == ChangeKind.Unknown)
                     {
                         continue;
                     }

@@ -355,7 +355,8 @@ public sealed class ChangeTransaction
 
         foreach (var change in plan.Changes)
         {
-            sb.AppendLine($"- {change.FilePath}: {change.SymbolName} ({change.ChangeKind})");
+            // План 22, этап 1.3: enum → прежняя wire-строка в сообщении коммита.
+            sb.AppendLine($"- {change.FilePath}: {change.SymbolName} ({ChangeKindFormat.ToWire(change.ChangeKind)})");
         }
 
         sb.AppendLine();

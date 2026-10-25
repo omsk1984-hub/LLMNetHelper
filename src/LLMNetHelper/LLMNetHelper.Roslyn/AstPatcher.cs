@@ -1,3 +1,4 @@
+using LLMNetHelper.Abstractions;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -39,13 +40,13 @@ public sealed class AstPatcher
     /// <param name="solution">Исходное решение.</param>
     /// <param name="filePath">Путь к файлу (абсолютный или относительный).</param>
     /// <param name="symbolName">Имя метода, тело которого меняем.</param>
-    /// <param name="changeKind">"ReplaceMethodBody" | "InsertNullCheck".</param>
+    /// <param name="changeKind">Вид правки (план 22, этап 1.3: перечисление <see cref="ChangeKind"/>).</param>
     /// <param name="newCode">Новый код тела метода.</param>
     public async Task<PatchResult> ApplyAsync(
         Solution solution,
         string filePath,
         string symbolName,
-        string changeKind,
+        ChangeKind changeKind,
         string newCode,
         CancellationToken ct = default)
     {
@@ -94,9 +95,9 @@ public sealed class AstPatcher
         {
             SyntaxNode newRoot = changeKind switch
             {
-                "ReplaceMethodBody" => ReplaceBody(root, method, newCode),
-                "InsertNullCheck" => InsertNullCheck(root, method, newCode),
-                _ => throw new NotSupportedException($"неподдерживаемый тип правки: {changeKind}")
+                ChangeKind.ReplaceMethodBody => ReplaceBody(root, method, newCode),
+                ChangeKind.InsertNullCheck => InsertNullCheck(root, method, newCode),
+                _ => throw new NotSupportedException($"неподдерживаемый тип правки: {ChangeKindFormat.ToWire(changeKind)}")
             };
 
             var updated = solution.WithDocumentSyntaxRoot(document.Id, newRoot);

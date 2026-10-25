@@ -108,7 +108,7 @@ public class ChangeTransactionTests : IAsyncLifetime
                 new ProposedChange(
                     FilePath: "src/Sample.cs",
                     SymbolName: "Compute",
-                    ChangeKind: "ReplaceMethodBody",
+                    ChangeKind: ChangeKind.ReplaceMethodBody,
                     NewCode: "if (value < 0) { return 0; }\nreturn value + 1;",
                     Explanation: "защита от отрицательных значений")
             ],
@@ -258,7 +258,7 @@ public class ChangeTransactionTests : IAsyncLifetime
         var plan = new FixPlan(
             "правка несуществующего метода",
             [
-                new ProposedChange("src/Sample.cs", "NoSuchMethod", "ReplaceMethodBody", "return 0;", "")
+                new ProposedChange("src/Sample.cs", "NoSuchMethod", ChangeKind.ReplaceMethodBody, "return 0;", "")
             ],
             [],
             false);

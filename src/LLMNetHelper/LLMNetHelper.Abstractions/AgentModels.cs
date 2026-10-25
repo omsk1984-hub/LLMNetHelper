@@ -26,16 +26,21 @@ public sealed record Hypothesis(
 
 /// <summary>
 /// Предлагаемое изменение кода.
+/// <para>
+/// План 22, этап 1.3: <see cref="ChangeKind"/> — перечисление; нераспознанный
+/// вид из ответа модели сохраняется как <see cref="ChangeKind.Unknown"/>
+/// и приводит к отказу применения (прежнее поведение для произвольной строки).
+/// </para>
 /// </summary>
 /// <param name="FilePath">Путь к файлу относительно корня репозитория.</param>
 /// <param name="SymbolName">Имя метода или класса, который меняем.</param>
-/// <param name="ChangeKind">"ReplaceMethodBody" | "InsertNullCheck".</param>
+/// <param name="ChangeKind">Вид правки: ReplaceMethodBody | InsertNullCheck | Unknown.</param>
 /// <param name="NewCode">Новый код (тело метода).</param>
 /// <param name="Explanation">Зачем это изменение.</param>
 public sealed record ProposedChange(
     string FilePath,
     string SymbolName,
-    string ChangeKind,
+    ChangeKind ChangeKind,
     string NewCode,
     string Explanation);
 
