@@ -31,9 +31,10 @@ public static class JsonReportRenderer
         var report = new
         {
             run_id = runInfo.Id,
-            started_at = runInfo.StartedAt,
-            window_from = runInfo.WindowFrom,
-            window_to = runInfo.WindowTo,
+            // План 22, этап 1.5: DateTime → прежняя ISO-строка ("o") в отчёте.
+            started_at = runInfo.StartedAt.ToString("o"),
+            window_from = runInfo.WindowFrom.ToString("o"),
+            window_to = runInfo.WindowTo.ToString("o"),
             // План 22, этап 1.1: enum → прежняя wire-строка отчёта.
             verdict = VerdictFormat.ToWire(analysis.Verdict),
             summary = analysis.Summary,

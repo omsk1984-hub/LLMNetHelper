@@ -91,8 +91,9 @@ public sealed class AgentRunner : IAgentRunner
                 "Начало прогона агента: окно {From:o} — {To:o}, dry-run={DryRun}, catch-up={CatchUp}",
                 windowFrom, windowTo, dryRun, catchUp);
 
+            // План 22, этап 1.5: границы окна — DateTime (UTC), конвертация — в хранилище.
             var runId = await _factStore.CreateRunAsync(
-                windowFrom.ToString("o"), windowTo.ToString("o"), ct).ConfigureAwait(false);
+                windowFrom, windowTo, ct).ConfigureAwait(false);
 
             // Обновляем correlation scope с реальным runId
             using (LogContext.PushProperty("RunId", runId))

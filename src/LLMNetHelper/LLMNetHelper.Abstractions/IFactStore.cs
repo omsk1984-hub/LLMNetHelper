@@ -12,8 +12,12 @@ public interface IFactStore : IDisposable
 
     /// <summary>
     /// Создаёт новый запуск и возвращает его ID.
+    /// <para>
+    /// План 22, этап 1.5: границы окна — <see cref="DateTime"/> (UTC);
+    /// конвертация в TEXT SQLite — внутри хранилища.
+    /// </para>
     /// </summary>
-    Task<long> CreateRunAsync(string windowFrom, string windowTo, CancellationToken ct = default);
+    Task<long> CreateRunAsync(DateTime windowFrom, DateTime windowTo, CancellationToken ct = default);
 
     /// <summary>
     /// Завершает запуск с результатом.

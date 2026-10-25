@@ -50,8 +50,9 @@ public class PrometheusFactCollector : FactCollector<MetricFact, PrometheusFacts
             {
                 Name = "dotnet_gc_collections_rate_per_hour",
                 Value = gcRate.Value,
-                WindowFrom = from.ToString("o"),
-                WindowTo = to.ToString("o")
+                // План 22, этап 1.5: DateTime (UTC) вместо строки.
+                WindowFrom = from,
+                WindowTo = to
             });
         }
 
@@ -63,8 +64,8 @@ public class PrometheusFactCollector : FactCollector<MetricFact, PrometheusFacts
             {
                 Name = "dotnet_thread_pool_thread_count",
                 Value = threadCount.Value,
-                WindowFrom = from.ToString("o"),
-                WindowTo = to.ToString("o")
+                WindowFrom = from,
+                WindowTo = to
             });
         }
 
@@ -76,8 +77,8 @@ public class PrometheusFactCollector : FactCollector<MetricFact, PrometheusFacts
             {
                 Name = "dotnet_exceptions_rate_per_hour",
                 Value = exceptions.Value,
-                WindowFrom = from.ToString("o"),
-                WindowTo = to.ToString("o")
+                WindowFrom = from,
+                WindowTo = to
             });
         }
 
@@ -110,8 +111,8 @@ public class PrometheusFactCollector : FactCollector<MetricFact, PrometheusFacts
             {
                 Name = "dotnet_process_memory_working_set_bytes",
                 Value = instant.Value,
-                WindowFrom = from.ToString("o"),
-                WindowTo = to.ToString("o")
+                WindowFrom = from,
+                WindowTo = to
             });
         }
 
@@ -127,8 +128,8 @@ public class PrometheusFactCollector : FactCollector<MetricFact, PrometheusFacts
                 Value = points.Last().Value,
                 SlopePerHour = trend.SlopePerHour,
                 R2 = trend.R2,
-                WindowFrom = from.ToString("o"),
-                WindowTo = to.ToString("o")
+                WindowFrom = from,
+                WindowTo = to
             });
         }
 
@@ -146,8 +147,8 @@ public class PrometheusFactCollector : FactCollector<MetricFact, PrometheusFacts
             {
                 Name = "dotnet_gc_last_collection_heap_size_bytes",
                 Value = instant.Value,
-                WindowFrom = from.ToString("o"),
-                WindowTo = to.ToString("o")
+                WindowFrom = from,
+                WindowTo = to
             });
         }
 
@@ -163,8 +164,8 @@ public class PrometheusFactCollector : FactCollector<MetricFact, PrometheusFacts
                 Value = points.Last().Value,
                 SlopePerHour = trend.SlopePerHour,
                 R2 = trend.R2,
-                WindowFrom = from.ToString("o"),
-                WindowTo = to.ToString("o")
+                WindowFrom = from,
+                WindowTo = to
             });
         }
 
@@ -180,8 +181,8 @@ public class PrometheusFactCollector : FactCollector<MetricFact, PrometheusFacts
             {
                 Name = "dotnet_gc_heap_size_bytes_gen2",
                 Value = instant.Value,
-                WindowFrom = from.ToString("o"),
-                WindowTo = to.ToString("o")
+                WindowFrom = from,
+                WindowTo = to
             }];
         }
         return [];

@@ -37,9 +37,10 @@ public class ReportEndToEndTests
     private static RunInfo SampleRunInfo() => new()
     {
         Id = 42,
-        StartedAt = "2026-01-01T00:00:00.0000000Z",
-        WindowFrom = "2026-01-01T00:00:00.0000000Z",
-        WindowTo = "2026-01-01T06:00:00.0000000Z",
+        // План 22, этап 1.5: метки времени — DateTime (UTC).
+        StartedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+        WindowFrom = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+        WindowTo = new DateTime(2026, 1, 1, 6, 0, 0, DateTimeKind.Utc),
         Status = RunStatus.Ok,
         Verdict = Verdict.Warning
     };

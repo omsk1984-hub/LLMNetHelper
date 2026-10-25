@@ -65,7 +65,8 @@ public class LokiFactCollector : FactCollector<LogFact, LokiFacts>
         {
             facts.Add(new LogFact
             {
-                BucketStart = bucketStart.ToString("yyyy-MM-ddTHHH:00:00Z"),
+                // План 22, этап 1.5: DateTime (UTC) вместо строки.
+                BucketStart = bucketStart,
                 Job = ExtractLabel(key, "job"),
                 Svc = ExtractLabel(key, "svc"),
                 Lvl = ExtractLabel(key, "lvl"),
@@ -87,7 +88,8 @@ public class LokiFactCollector : FactCollector<LogFact, LokiFacts>
         {
             facts.Add(new LogFact
             {
-                BucketStart = bucketStart.ToString("yyyy-MM-ddTHHH:00:00Z"),
+                // План 22, этап 1.5: DateTime (UTC) вместо строки.
+                BucketStart = bucketStart,
                 Job = ExtractLabel(key, "job"),
                 Logger = ExtractLabel(key, "logger"),
                 Lvl = "fail|crit",
@@ -110,7 +112,8 @@ public class LokiFactCollector : FactCollector<LogFact, LokiFacts>
         {
             facts.Add(new LogFact
             {
-                BucketStart = bucketStart.ToString("yyyy-MM-ddTHHH:00:00Z"),
+                // План 22, этап 1.5: DateTime (UTC) вместо строки.
+                BucketStart = bucketStart,
                 Job = ExtractLabel(key, "job"),
                 Symbol = ExtractLabel(key, "symbol"),
                 Lvl = "fail|crit",
@@ -136,26 +139,30 @@ public class LokiFactCollector : FactCollector<LogFact, LokiFacts>
     }
 
     // План 22, этап 1.6: типизированный LokiEntry вместо Dictionary<string, object>.
+    // План 22, этап 1.5: метки времени — DateTime (UTC); наносекунды Loki
+    // парсятся с fallback на DateTime.MinValue (нераспознаваемый формат
+    // не должен ронять сбор фактов).
     private static List<ErrorSample> NormalizeErrorSamples(
         List<LokiEntry> entries, DateTime from, DateTime to)
     {
-        var grouped = new Dictionary<string, (List<string> texts, int count, string firstSeen, string lastSeen)>();
+        var grouped = new Dictionary<string, (List<string> texts, int count, DateTime firstSeen, DateTime lastSeen)>();
 
         foreach (var entry in entries)
         {
             var text = entry.Text;
+            var timestamp = ParseLokiTimestamp(entry.Timestamp);
 
             var normalized = ErrorSignatureNormalizer.Normalize(text);
             var signature = ErrorSignatureNormalizer.ComputeHash(normalized);
 
             if (!grouped.TryGetValue(signature, out var group))
             {
-                group = (new List<string>(), 0, entry.Timestamp, entry.Timestamp);
+                group = (new List<string>(), 0, timestamp, timestamp);
                 grouped[signature] = group;
             }
 
             group.count++;
-            group.lastSeen = entry.Timestamp;
+            group.lastSeen = timestamp;
             if (group.texts.Count == 0)
                 group.texts.Add(text);
         }
@@ -180,6 +187,33 @@ public class LokiFactCollector : FactCollector<LogFact, LokiFacts>
         }
 
         return samples.OrderByDescending(s => s.Count).ToList();
+    }
+
+    /// <summary>
+    /// Парсит метку времени записи Loki (unix-наносекунды строкой или числом)
+    /// в UTC-<see cref="DateTime"/>. Нераспознанное значение —
+    /// <see cref="DateTime.MinValue"/> (сбор фактов не падает).
+    /// </summary>
+    internal static DateTime ParseLokiTimestamp(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return DateTime.MinValue;
+        }
+
+        // Наносекунды могут не помещаться в long у «далёких» дат —
+        // парсим в decimal и делим, округляя вниз до миллисекунд.
+        if (decimal.TryParse(value, System.Globalization.NumberStyles.Integer,
+                System.Globalization.CultureInfo.InvariantCulture, out var ns))
+        {
+            var ms = ns / 1_000_000m;
+            if (ms >= long.MinValue && ms <= long.MaxValue)
+            {
+                return DateTimeOffset.FromUnixTimeMilliseconds((long)decimal.Truncate(ms)).UtcDateTime;
+            }
+        }
+
+        return DateTime.MinValue;
     }
 
     private static string ExtractLabel(string labelString, string name)

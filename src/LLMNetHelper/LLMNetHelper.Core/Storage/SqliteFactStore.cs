@@ -50,7 +50,15 @@ public sealed class SqliteFactStore : IFactStore
         await migrateCmd.ExecuteNonQueryAsync(ct);
     }
 
-    public async Task<long> CreateRunAsync(string windowFrom, string windowTo, CancellationToken ct = default)
+    // План 22, этап 1.5: DateTime (UTC) ↔ TEXT ISO-8601 — внутри хранилища;
+    // формат колонок не меняется ("o" — round-trip).
+    private static string ToDbText(DateTime value) => value.ToString("o");
+
+    private static DateTime FromDbText(string value) =>
+        DateTime.Parse(value, System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.RoundtripKind);
+
+    public async Task<long> CreateRunAsync(DateTime windowFrom, DateTime windowTo, CancellationToken ct = default)
     {
         using var conn = new SqliteConnection(_connectionString);
         await conn.OpenAsync(ct);
@@ -61,9 +69,9 @@ public sealed class SqliteFactStore : IFactStore
             VALUES (@started_at, @window_from, @window_to, 'in_progress');
             SELECT last_insert_rowid();";
 
-        cmd.Parameters.AddWithValue("@started_at", DateTime.UtcNow.ToString("o"));
-        cmd.Parameters.AddWithValue("@window_from", windowFrom);
-        cmd.Parameters.AddWithValue("@window_to", windowTo);
+        cmd.Parameters.AddWithValue("@started_at", ToDbText(DateTime.UtcNow));
+        cmd.Parameters.AddWithValue("@window_from", ToDbText(windowFrom));
+        cmd.Parameters.AddWithValue("@window_to", ToDbText(windowTo));
 
         var result = await cmd.ExecuteScalarAsync(ct);
         return Convert.ToInt64(result!);
@@ -81,7 +89,7 @@ public sealed class SqliteFactStore : IFactStore
             SET finished_at = @finished_at, status = @status, verdict = @verdict, error = @error
             WHERE id = @run_id;";
 
-        cmd.Parameters.AddWithValue("@finished_at", DateTime.UtcNow.ToString("o"));
+        cmd.Parameters.AddWithValue("@finished_at", ToDbText(DateTime.UtcNow));
         // План 22, этап 1.2: enum → прежняя wire-строка в колонке runs.status.
         cmd.Parameters.AddWithValue("@status", RunStatusFormat.ToWire(status));
         // План 22, этап 1.1: enum → прежняя wire-строка в колонке runs.verdict.
@@ -110,7 +118,7 @@ public sealed class SqliteFactStore : IFactStore
                     VALUES (@run_id, @bucket, @job, @svc, @lvl, @logger, @symbol, @count);";
 
                 cmd.Parameters.AddWithValue("@run_id", runId);
-                cmd.Parameters.AddWithValue("@bucket", fact.BucketStart);
+                cmd.Parameters.AddWithValue("@bucket", ToDbText(fact.BucketStart));
                 cmd.Parameters.AddWithValue("@job", (object?)fact.Job ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@svc", (object?)fact.Svc ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@lvl", (object?)fact.Lvl ?? DBNull.Value);
@@ -152,8 +160,8 @@ public sealed class SqliteFactStore : IFactStore
                 cmd.Parameters.AddWithValue("@job", (object?)sample.Job ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@logger", (object?)sample.Logger ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@symbol", (object?)sample.Symbol ?? DBNull.Value);
-                cmd.Parameters.AddWithValue("@first", sample.FirstSeen);
-                cmd.Parameters.AddWithValue("@last", sample.LastSeen);
+                cmd.Parameters.AddWithValue("@first", ToDbText(sample.FirstSeen));
+                cmd.Parameters.AddWithValue("@last", ToDbText(sample.LastSeen));
                 cmd.Parameters.AddWithValue("@count", sample.Count);
                 cmd.Parameters.AddWithValue("@text", sample.SampleText);
 
@@ -191,8 +199,10 @@ public sealed class SqliteFactStore : IFactStore
                 cmd.Parameters.AddWithValue("@value", fact.Value);
                 cmd.Parameters.AddWithValue("@slope", fact.SlopePerHour);
                 cmd.Parameters.AddWithValue("@r2", fact.R2);
-                cmd.Parameters.AddWithValue("@wf", (object?)fact.WindowFrom ?? DBNull.Value);
-                cmd.Parameters.AddWithValue("@wt", (object?)fact.WindowTo ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@wf",
+                    fact.WindowFrom is { } wf ? ToDbText(wf) : DBNull.Value);
+                cmd.Parameters.AddWithValue("@wt",
+                    fact.WindowTo is { } wt ? ToDbText(wt) : DBNull.Value);
 
                 await cmd.ExecuteNonQueryAsync(ct);
                 cmd.Parameters.Clear();
@@ -254,10 +264,10 @@ public sealed class SqliteFactStore : IFactStore
             return new RunInfo
             {
                 Id = reader.GetInt64(0),
-                StartedAt = reader.GetString(1),
-                FinishedAt = reader.IsDBNull(2) ? null : reader.GetString(2),
-                WindowFrom = reader.GetString(3),
-                WindowTo = reader.GetString(4),
+                StartedAt = FromDbText(reader.GetString(1)),
+                FinishedAt = reader.IsDBNull(2) ? null : FromDbText(reader.GetString(2)),
+                WindowFrom = FromDbText(reader.GetString(3)),
+                WindowTo = FromDbText(reader.GetString(4)),
                 // План 22, этап 1.2: wire-строка → enum на выходе хранилища.
                 Status = RunStatusFormat.Parse(reader.GetString(5)),
                 // План 22, этап 1.1: wire-строка → enum на выходе хранилища.
@@ -295,8 +305,8 @@ public sealed class SqliteFactStore : IFactStore
                 Job = reader.IsDBNull(2) ? "" : reader.GetString(2),
                 Logger = reader.IsDBNull(3) ? "" : reader.GetString(3),
                 Symbol = reader.IsDBNull(4) ? "" : reader.GetString(4),
-                FirstSeen = reader.GetString(5),
-                LastSeen = reader.GetString(6),
+                FirstSeen = FromDbText(reader.GetString(5)),
+                LastSeen = FromDbText(reader.GetString(6)),
                 Count = reader.GetInt32(7),
                 SampleText = reader.GetString(8)
             });
@@ -324,7 +334,7 @@ public sealed class SqliteFactStore : IFactStore
         {
             facts.Add(new LogFact
             {
-                BucketStart = reader.GetString(0),
+                BucketStart = FromDbText(reader.GetString(0)),
                 Job = reader.IsDBNull(1) ? "" : reader.GetString(1),
                 Svc = reader.IsDBNull(2) ? "" : reader.GetString(2),
                 Lvl = reader.IsDBNull(3) ? "" : reader.GetString(3),

@@ -36,8 +36,9 @@ public static class MarkdownReportRenderer
 
         // Шапка
         sb.AppendLine($"**Вердикт:** {GetVerdictEmoji(analysis.Verdict)} {VerdictFormat.ToWire(analysis.Verdict)}");
-        sb.AppendLine($"**Запуск:** {runInfo.StartedAt} UTC");
-        sb.AppendLine($"**Окно:** {runInfo.WindowFrom} — {runInfo.WindowTo}");
+        // План 22, этап 1.5: DateTime → прежняя ISO-строка ("o") в отчёте.
+        sb.AppendLine($"**Запуск:** {runInfo.StartedAt:O} UTC");
+        sb.AppendLine($"**Окно:** {runInfo.WindowFrom:O} — {runInfo.WindowTo:O}");
         sb.AppendLine($"**LLM-провайдер:** {llmProvider}");
 
         if (promptTokens.HasValue && completionTokens.HasValue)

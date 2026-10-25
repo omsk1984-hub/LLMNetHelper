@@ -6,6 +6,10 @@ namespace LLMNetHelper.Tests.Storage;
 
 public class SqliteFactStoreTests
 {
+    // План 22, этап 1.5: границы окна — DateTime (UTC) вместо строк.
+    private static readonly DateTime WINDOW_FROM = new(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+    private static readonly DateTime WINDOW_TO = new(2026, 1, 2, 0, 0, 0, DateTimeKind.Utc);
+
     private static string GetTempDbPath()
     {
         return Path.Combine(Path.GetTempPath(), $"test_facts_{Guid.NewGuid()}.db");
@@ -39,7 +43,7 @@ public class SqliteFactStoreTests
             var store = new SqliteFactStore(dbPath);
             await store.InitializeAsync();
 
-            var runId = await store.CreateRunAsync("2026-01-01T00:00:00Z", "2026-01-02T00:00:00Z");
+            var runId = await store.CreateRunAsync(WINDOW_FROM, WINDOW_TO);
 
             Assert.True(runId > 0);
         }
@@ -59,7 +63,7 @@ public class SqliteFactStoreTests
             var store = new SqliteFactStore(dbPath);
             await store.InitializeAsync();
 
-            var runId = await store.CreateRunAsync("2026-01-01T00:00:00Z", "2026-01-02T00:00:00Z");
+            var runId = await store.CreateRunAsync(WINDOW_FROM, WINDOW_TO);
             await store.FinishRunAsync(runId, RunStatus.Ok, Verdict.Warning, null);
 
             var run = await store.GetLastSuccessfulRunAsync(48);
@@ -85,12 +89,13 @@ public class SqliteFactStoreTests
             var store = new SqliteFactStore(dbPath);
             await store.InitializeAsync();
 
-            var runId = await store.CreateRunAsync("2026-01-01T00:00:00Z", "2026-01-02T00:00:00Z");
+            var runId = await store.CreateRunAsync(WINDOW_FROM, WINDOW_TO);
 
             var facts = new List<Abstractions.LogFact>
             {
-                new() { BucketStart = "2026-01-01T10:00:00Z", Job = "artas_writer", Lvl = "fail", Count = 5 },
-                new() { BucketStart = "2026-01-01T11:00:00Z", Job = "artas_stat", Lvl = "crit", Count = 2 }
+                // План 22, этап 1.5: метки времени — DateTime (UTC).
+                new() { BucketStart = new DateTime(2026, 1, 1, 10, 0, 0, DateTimeKind.Utc), Job = "artas_writer", Lvl = "fail", Count = 5 },
+                new() { BucketStart = new DateTime(2026, 1, 1, 11, 0, 0, DateTimeKind.Utc), Job = "artas_stat", Lvl = "crit", Count = 2 }
             };
 
             await store.SaveLogFactsAsync(runId, facts);
@@ -114,7 +119,7 @@ public class SqliteFactStoreTests
             var store = new SqliteFactStore(dbPath);
             await store.InitializeAsync();
 
-            var runId = await store.CreateRunAsync("2026-01-01T00:00:00Z", "2026-01-02T00:00:00Z");
+            var runId = await store.CreateRunAsync(WINDOW_FROM, WINDOW_TO);
 
             var samples = new List<Abstractions.ErrorSample>
             {
@@ -123,8 +128,9 @@ public class SqliteFactStoreTests
                     Signature = "abc123",
                     Lvl = "fail",
                     Count = 10,
-                    FirstSeen = "2026-01-01T10:00:00Z",
-                    LastSeen = "2026-01-01T15:00:00Z",
+                    // План 22, этап 1.5: метки времени — DateTime (UTC).
+                    FirstSeen = new DateTime(2026, 1, 1, 10, 0, 0, DateTimeKind.Utc),
+                    LastSeen = new DateTime(2026, 1, 1, 15, 0, 0, DateTimeKind.Utc),
                     SampleText = "Error occurred"
                 }
             };
@@ -153,8 +159,8 @@ public class SqliteFactStoreTests
             await store.InitializeAsync();
 
             // Создаём "старый" запуск (вчера)
-            var yesterday = DateTime.UtcNow.AddDays(-1).ToString("o");
-            var runId = await store.CreateRunAsync(yesterday, DateTime.UtcNow.ToString("o"));
+            var yesterday = DateTime.UtcNow.AddDays(-1);
+            var runId = await store.CreateRunAsync(yesterday, DateTime.UtcNow);
             await store.FinishRunAsync(runId, RunStatus.Ok, Verdict.Ok, null);
 
             // Очищаем с retention = 0 дней
@@ -180,8 +186,8 @@ public class SqliteFactStoreTests
             await store.InitializeAsync();
 
             // Два одинаковых прогона
-            var runId1 = await store.CreateRunAsync("2026-01-01T00:00:00Z", "2026-01-02T00:00:00Z");
-            var runId2 = await store.CreateRunAsync("2026-01-01T00:00:00Z", "2026-01-02T00:00:00Z");
+            var runId1 = await store.CreateRunAsync(WINDOW_FROM, WINDOW_TO);
+            var runId2 = await store.CreateRunAsync(WINDOW_FROM, WINDOW_TO);
 
             Assert.NotEqual(runId1, runId2); // Разные ID
         }

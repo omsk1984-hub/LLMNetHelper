@@ -52,9 +52,10 @@ public sealed class GenerateReportStep : IRunStep
         var runInfo = new RunInfo
         {
             Id = context.RunId,
-            StartedAt = context.WindowFrom.ToString("o"),
-            WindowFrom = context.WindowFrom.ToString("o"),
-            WindowTo = context.WindowTo.ToString("o"),
+            // План 22, этап 1.5: DateTime (UTC) вместо строк.
+            StartedAt = context.WindowFrom,
+            WindowFrom = context.WindowFrom,
+            WindowTo = context.WindowTo,
             Status = RunStatus.Ok,
             Verdict = analysis.Verdict
         };
