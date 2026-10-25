@@ -10,7 +10,8 @@ namespace LLMNetHelper.Core.Snapshot;
 /// Отвечает только за Markdown-рендеринг.
 /// Token budget применяется отдельным компонентом <see cref="ISnapshotBudgetEnforcer"/>.
 /// </summary>
-public class SnapshotBuilder
+// План 22, этап 2.5: реализация контракта ISnapshotBuilder.
+public class SnapshotBuilder : ISnapshotBuilder
 {
     private readonly IOptions<AgentOptions> _options;
     private readonly IFactStore _factStore;

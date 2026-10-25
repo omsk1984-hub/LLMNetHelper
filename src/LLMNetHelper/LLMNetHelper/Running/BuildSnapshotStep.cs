@@ -13,13 +13,14 @@ public sealed class BuildSnapshotStep : IRunStep
 {
     public string Name => "BuildSnapshot";
 
-    private readonly SnapshotBuilder _snapshotBuilder;
+    // План 22, этап 2.5: зависимость от абстракции ISnapshotBuilder.
+    private readonly ISnapshotBuilder _snapshotBuilder;
     private readonly IReportWriter _reportWriter;
     private readonly IOptions<AgentOptions> _options;
     private readonly ILogger<BuildSnapshotStep> _logger;
 
     public BuildSnapshotStep(
-        SnapshotBuilder snapshotBuilder,
+        ISnapshotBuilder snapshotBuilder,
         IReportWriter reportWriter,
         IOptions<AgentOptions> options,
         ILogger<BuildSnapshotStep> logger)

@@ -79,7 +79,8 @@ public static class DependencyInjection
 
         // --- Ядро: сводка и отчётность ---
         services.AddSingleton<ISnapshotBudgetEnforcer, TokenBudgetGuard>();
-        services.AddSingleton<SnapshotBuilder>();
+        // План 22, этап 2.5: регистрация по интерфейсу ISnapshotBuilder.
+        services.AddSingleton<ISnapshotBuilder, SnapshotBuilder>();
         services.AddSingleton<IReportWriter>(sp =>
         {
             var options = sp.GetRequiredService<IOptions<AgentOptions>>().Value;
