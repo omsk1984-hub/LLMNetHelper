@@ -66,6 +66,10 @@ public static class DependencyInjection
         // готового синглтона, а не IOptions<>: чат создаётся вне hosted-слоя.
         services.AddSingleton(chatOptions);
 
+        // План 22, этап 6.1: промпты чата — экземплярный сервис по интерфейсу
+        // (подмена в тестах, версионирование).
+        services.AddSingleton<IChatPromptBuilder, ChatPromptBuilder>();
+
         // --- Хранилище фактов ---
         services.AddSingleton<IFactStore>(sp =>
         {

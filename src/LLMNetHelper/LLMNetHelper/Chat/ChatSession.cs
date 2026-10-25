@@ -41,6 +41,10 @@ public sealed class ChatSession
     // CallGraphService, FailurePointAnalyzer, RoslynOptions).
     private readonly IRoslynToolFactory? _roslynFactory;
 
+    // План 22, этап 6.1: промпты чата через абстракцию (подменяемость,
+    // версионирование) вместо статического ChatPromptBuilder.
+    private readonly IChatPromptBuilder _promptBuilder;
+
     private readonly List<ChatMessage> _history = [];
     private bool _toolsMode;
     private IChatTranscript _transcript = NullChatTranscript.Instance;
@@ -53,7 +57,8 @@ public sealed class ChatSession
         ILoggerFactory loggerFactory,
         TextReader @in,
         TextWriter @out,
-        IRoslynToolFactory? roslynFactory = null)
+        IRoslynToolFactory? roslynFactory = null,
+        IChatPromptBuilder? chatPromptBuilder = null)
     {
         _chat = chat;
         _scope = scope;
@@ -63,6 +68,7 @@ public sealed class ChatSession
         _in = @in;
         _out = @out;
         _roslynFactory = roslynFactory;
+        _promptBuilder = chatPromptBuilder ?? new ChatPromptBuilder();
     }
 
     /// <summary>
@@ -245,7 +251,7 @@ public sealed class ChatSession
             _transcript.LogContextDocuments(search.Documents);
 
             var messagesA = NewConversation(withTools: false);
-            messagesA.Add(new ChatMessage(ChatRole.User, ChatPromptBuilder.BuildUserPrompt(question, search.Documents)));
+            messagesA.Add(new ChatMessage(ChatRole.User, _promptBuilder.BuildUserPrompt(question, search.Documents)));
 
             var response = await _chat.GetResponseAsync(messagesA, cancellationToken: ct).ConfigureAwait(false);
             var text = response.Text ?? "[пустой ответ]";
@@ -280,7 +286,7 @@ public sealed class ChatSession
     {
         var messages = new List<ChatMessage>
         {
-            new(ChatRole.System, ChatPromptBuilder.BuildSystemPrompt(
+            new(ChatRole.System, _promptBuilder.BuildSystemPrompt(
                 DescribeScope(),
                 withTools,
                 withTools ? BuildToolRegistry().DescribeForPrompt() : null))

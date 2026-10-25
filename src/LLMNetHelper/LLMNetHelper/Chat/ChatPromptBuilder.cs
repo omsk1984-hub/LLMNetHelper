@@ -4,10 +4,12 @@ using LLMNetHelper.Abstractions;
 namespace LLMNetHelper.Chat;
 
 /// <summary>
-/// Сборка промптов чата. В отличие от ночного агента (<c>AgentPromptBuilder</c>),
+/// Сборка промптов чата (план 22, этап 6.1: экземплярный класс, реализующий
+/// <see cref="IChatPromptBuilder"/> — подменяемость в тестах, версионирование).
+/// В отличие от ночного агента (<c>AgentPromptBuilder</c>),
 /// чат отвечает в свободной форме (Markdown), а не по JSON-схеме диагноза.
 /// </summary>
-public static class ChatPromptBuilder
+public sealed class ChatPromptBuilder : IChatPromptBuilder
 {
     /// <summary>
     /// Системный промпт: роль ассистента по коду репозиториев группы,
@@ -16,7 +18,7 @@ public static class ChatPromptBuilder
     /// <param name="scopeDescription">Описание текущей области (путь, репозиторий).</param>
     /// <param name="withTools">true — включён режим /tools (модель может вызывать инструменты).</param>
     /// <param name="toolDescriptions">Описания инструментов (для режима /tools).</param>
-    public static string BuildSystemPrompt(
+    public string BuildSystemPrompt(
         string scopeDescription,
         bool withTools,
         string? toolDescriptions = null)
@@ -49,7 +51,7 @@ public static class ChatPromptBuilder
     /// <summary>
     /// Пользовательский промпт: вопрос + найденные фрагменты контекста.
     /// </summary>
-    public static string BuildUserPrompt(string question, IReadOnlyList<ContextDocument> documents)
+    public string BuildUserPrompt(string question, IReadOnlyList<ContextDocument> documents)
     {
         var sb = new StringBuilder();
 

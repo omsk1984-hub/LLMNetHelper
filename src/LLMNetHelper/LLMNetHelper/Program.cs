@@ -1,5 +1,6 @@
 using System.Text;
 using LLMNetHelper;
+using LLMNetHelper.Abstractions;
 using LLMNetHelper.Chat;
 using LLMNetHelper.GitLab;
 using LLMCore.Abstractions;
@@ -205,7 +206,9 @@ internal static class Program
                 host.Services.GetRequiredService<ILoggerFactory>(),
                 Console.In,
                 Console.Out,
-                host.Services.GetService<IRoslynToolFactory>());
+                host.Services.GetService<IRoslynToolFactory>(),
+                // План 22, этап 6.1: промпты чата через абстракцию из контейнера.
+                host.Services.GetRequiredService<IChatPromptBuilder>());
 
             if (tools)
             {

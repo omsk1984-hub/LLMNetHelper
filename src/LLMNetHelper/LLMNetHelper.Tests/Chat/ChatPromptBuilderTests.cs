@@ -5,10 +5,13 @@ namespace LLMNetHelper.Tests.Chat;
 
 public class ChatPromptBuilderTests
 {
+    // План 22, этап 6.1: ChatPromptBuilder — экземплярный класс (IChatPromptBuilder).
+    private static readonly ChatPromptBuilder Builder = new();
+
     [Fact]
     public void SystemPrompt_ContainsScopeAndCitationRules()
     {
-        var prompt = ChatPromptBuilder.BuildSystemPrompt("все репозитории (C:\\repos\\GPM)", withTools: false);
+        var prompt = Builder.BuildSystemPrompt("все репозитории (C:\\repos\\GPM)", withTools: false);
 
         Assert.Contains("ассистент", prompt, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("C:\\repos\\GPM", prompt, StringComparison.Ordinal);
@@ -19,7 +22,7 @@ public class ChatPromptBuilderTests
     [Fact]
     public void SystemPrompt_WithoutTools_HasNoToolSection()
     {
-        var prompt = ChatPromptBuilder.BuildSystemPrompt("область", withTools: false);
+        var prompt = Builder.BuildSystemPrompt("область", withTools: false);
 
         Assert.DoesNotContain("repo_search", prompt, StringComparison.Ordinal);
         Assert.DoesNotContain("Инструменты", prompt, StringComparison.Ordinal);
@@ -29,7 +32,7 @@ public class ChatPromptBuilderTests
     public void SystemPrompt_WithTools_IncludesDescriptionsAndJsonFormat()
     {
         var tools = "- `repo_search`: ищет по файлам\n- `repo_read_file`: читает файл\n";
-        var prompt = ChatPromptBuilder.BuildSystemPrompt("область", withTools: true, toolDescriptions: tools);
+        var prompt = Builder.BuildSystemPrompt("область", withTools: true, toolDescriptions: tools);
 
         Assert.Contains("repo_search", prompt, StringComparison.Ordinal);
         Assert.Contains("{\"tool\":", prompt, StringComparison.Ordinal);
@@ -45,7 +48,7 @@ public class ChatPromptBuilderTests
             new("local-folder", "beta/README.md#0", "beta/README.md — README", "# Beta сервис", 0.9)
         };
 
-        var prompt = ChatPromptBuilder.BuildUserPrompt("Что делает Program?", docs);
+        var prompt = Builder.BuildUserPrompt("Что делает Program?", docs);
 
         Assert.Contains("Что делает Program?", prompt, StringComparison.Ordinal);
         Assert.Contains("class Program { }", prompt, StringComparison.Ordinal);
@@ -56,7 +59,7 @@ public class ChatPromptBuilderTests
     [Fact]
     public void UserPrompt_NoDocuments_StatesNothingFound()
     {
-        var prompt = ChatPromptBuilder.BuildUserPrompt("вопрос", []);
+        var prompt = Builder.BuildUserPrompt("вопрос", []);
 
         Assert.Contains("ничего не найдено", prompt, StringComparison.Ordinal);
         Assert.Contains("вопрос", prompt, StringComparison.Ordinal);
