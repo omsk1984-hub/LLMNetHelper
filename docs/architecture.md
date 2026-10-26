@@ -80,6 +80,11 @@ Markdown + JSON + patch.diff в Agent:ReportsDir
 Оба оркестратора используют один и тот же `AgentPromptBuilder`, поэтому
 текст промпта не зависит от «движка».
 
+Схема ReAct-цикла по шагам, стратегии (`DiagnosisReActStrategy` /
+`ChatReActStrategy`), текстовый протокол вызова инструментов и состав белых
+списков (8 инструментов прогона, 6 инструментов чата) — в
+[agent-loop.md](agent-loop.md).
+
 ## LLM-транспорты
 
 | Провайдер | `IAnalysisLlmClient` | `IChatClient` |

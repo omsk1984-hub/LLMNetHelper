@@ -45,6 +45,21 @@ pwsh -NoProfile -Command "[Console]::OutputEncoding=[Text.Encoding]::UTF8; $Outp
 
 Подробности — `.roo/rules-code/02-powershell.md`.
 
+## Поиск и анализ кода: MCP-сервер `roslyn-codelens`
+
+Для любых вопросов о C#-коде решения `src/LLMNetHelper/LLMNetHelper.slnx`
+(определения, ссылки, вызывающие, реализации, сигнатуры, диагностики,
+исключения, покрытие тестами, стек-трейсы, зависимости и слоистость) —
+сначала семантические инструменты MCP `roslyn-codelens`, а не текстовый
+поиск. `search_files` / `codebase_search` — только для комментариев,
+строковых литералов, конфигов, документации и не-C# файлов.
+Изменяющие инструменты (`rename_symbol`, `change_signature`,
+`apply_code_action`) — только через `preview: true`: они пишут на диск
+в обход ограничений режимов.
+Подробности — `.roo/rules/02-roslyn-codelens.md`, усиление для code-режима —
+`.roo/rules-code/03-roslyn.md`, полный справочник — скилл
+`roslyn-codelens-usage`.
+
 ## Тесты: только через `dotnet test src/LLMNetHelper/LLMNetHelper.slnx`
 
 См. `.roo/rules-code/01-test.md`.
